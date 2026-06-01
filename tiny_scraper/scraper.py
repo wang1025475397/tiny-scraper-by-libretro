@@ -93,19 +93,69 @@ class Scraper:
 
         return available_systems
 
-    def scrape_screenshot(
-        self, crc: str, game_name: str, system_id: int
-    ) -> bytes | None:
+    def _get_ssl_context(self):
         ctx = ssl.create_default_context()
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE
+        return ctx
+
+    def _extract_screenshot_from_game(self, game_data, game_name) -> bytes | None:
+        """从游戏数据中提取截图，返回图片bytes"""
+        medias = [media for media in game_data.get("medias", [])
+                  if media.get("type") == self.media_type]
+
+        screenshot_url = ""
+        regions_to_try = [self.region]
+        if DEFAULT_REGION not in regions_to_try:
+            regions_to_try.append(DEFAULT_REGION)
+
+        for target in regions_to_try:
+            for media in medias:
+                if media.get("region") == target:
+                    screenshot_url = media.get("url")
+                    print(f"Found screenshot for media type '{self.media_type}' in region '{target}'")
+                    break
+            if screenshot_url:
+                break
+
+        if not screenshot_url and medias:
+            screenshot_url = medias[0].get("url")
+            print(f"No match for preferred regions. Using fallback region '{medias[0].get('region')}'")
+
+        if screenshot_url:
+            ctx = self._get_ssl_context()
+            img_request = Request(screenshot_url)
+            with urlopen(img_request, context=ctx) as img_response:
+                if img_response.headers.get("Content-Type") == "image/png":
+                    return img_response.read()
+                else:
+                    print(f"Invalid image format for {game_name}")
+        else:
+            print(f"No screenshot URL found for {game_name}")
+        return None
+
+    def scrape_screenshot(
+        self, crc: str, game_name: str, system_id: int
+    ) -> bytes | None:
+        """总入口：先按hash刮削，失败则按名称刮削"""
+        result = self.scrape_screenshot_by_hash(crc, game_name, system_id)
+        if result is not None:
+            return result
+        print(f"Hash scrape failed for {game_name}, trying by name...")
+        return self.scrape_screenshot_by_name(game_name, system_id)
+
+    def scrape_screenshot_by_hash(
+        self, crc: str, game_name: str, system_id: int
+    ) -> bytes | None:
+        """通过CRC哈希刮削截图 (jeuInfos.php)"""
+        ctx = self._get_ssl_context()
 
         decoded_devid = base64.b64decode(self.devid).decode()
         decoded_devpassword = base64.b64decode(self.devpassword).decode()
         encoded_game_name = urllib.parse.quote(game_name)
         url = f"https://api.screenscraper.fr/api2/jeuInfos.php?devid={decoded_devid}&devpassword={decoded_devpassword}&softname=tiny-scraper&output=json&ssid={self.user}&sspassword={self.password}&crc={crc}&systemeid={system_id}&romtype=rom&romnom={encoded_game_name}"
 
-        print(f"Scraping screenshot for {game_name}...")
+        print(f"Scraping screenshot by hash for {game_name}...")
         request = Request(url)
         try:
             with urlopen(request, context=ctx) as response:
@@ -113,69 +163,49 @@ class Scraper:
                     try:
                         data = json.loads(response.read())
                         game_data = data.get("response").get("jeu")
-
-                        medias = [media for media in game_data.get("medias", [])
-                                  if media.get("type") == self.media_type]
-                        
-                        screenshot_url = ""
-                        # Define priority: target region, then default region, then any
-                        regions_to_try = [self.region]
-                        if DEFAULT_REGION not in regions_to_try:
-                            regions_to_try.append(DEFAULT_REGION)
-
-                        for target in regions_to_try:
-                            for media in medias:
-                                if media.get("region") == target:
-                                    screenshot_url = media.get("url")
-                                    print(f"Found screenshot for media type '{self.media_type}' in region '{target}'")
-                                    break
-                            if screenshot_url:
-                                break
-                        
-                        # Fallback to first available if still no match
-                        if not screenshot_url and medias:
-                            screenshot_url = medias[0].get("url")
-                            print(f"No match for preferred regions. Using fallback region '{medias[0].get('region')}'")
-
-                        
-                        if not screenshot_url:
-                            print(f"No matching screenshot found for media type '{self.media_type}' in region '{self.region}'. Trying default region ('{DEFAULT_REGION}')")
-                        # Fall back to DEFAULT_REGION if no match
-                        if not screenshot_url:
-                            for media in medias:
-                                if media.get("region") == DEFAULT_REGION:
-                                    screenshot_url = media["url"]
-                                    print(f"Found screenshot in default region ('{DEFAULT_REGION})'")
-                                    break
-
-                        if not screenshot_url:
-                            print(f"Still no match in default region. Trying any region...")
-
-                        # Fall back to first match
-                        if not screenshot_url:
-                            for media in medias:
-                                screenshot_url = media["url"]
-                                print(f"Found screenshot in region '{media.region}'")
-                                break
-
-                        if screenshot_url:
-                            img_request = Request(screenshot_url)
-                            with urlopen(img_request, context=ctx) as img_response:
-                                if (
-                                    img_response.headers.get("Content-Type")
-                                    == "image/png"
-                                ):
-                                    return img_response.read()
-                                else:
-                                    print(f"Invalid image format for {game_name}")
+                        if game_data:
+                            return self._extract_screenshot_from_game(game_data, game_name)
                         else:
-                            print(f"No screenshot URL found for {game_name}")
+                            print(f"No game data found for {game_name}")
                     except ValueError:
                         print(f"Invalid JSON response for {game_name}")
                 else:
                     print(f"Failed to get screenshot for {game_name}")
             return None
         except Exception as e:
-            print(f"Error scraping screenshot for {game_name}: {e}")
-            print(f"URL used: {url}")
+            print(f"Error scraping screenshot by hash for {game_name}: {e}")
+            return None
+
+    def scrape_screenshot_by_name(
+        self, game_name: str, system_id: int
+    ) -> bytes | None:
+        """通过游戏名称刮削截图 (jeuRecherche.php)"""
+        ctx = self._get_ssl_context()
+
+        decoded_devid = base64.b64decode(self.devid).decode()
+        decoded_devpassword = base64.b64decode(self.devpassword).decode()
+        encoded_game_name = urllib.parse.quote(game_name)
+        url = f"https://api.screenscraper.fr/api2/jeuRecherche.php?devid={decoded_devid}&devpassword={decoded_devpassword}&softname=tiny-scraper&output=json&ssid={self.user}&sspassword={self.password}&recherche={encoded_game_name}&systemeid={system_id}"
+
+        print(f"Scraping screenshot by name for {game_name}...")
+        request = Request(url)
+        try:
+            with urlopen(request, context=ctx) as response:
+                if response.status == 200:
+                    try:
+                        data = json.loads(response.read())
+                        jeux = data.get("response").get("jeux", [])
+                        if not jeux:
+                            print(f"No games found by name for {game_name}")
+                            return None
+                        # 取搜索结果中的第一个游戏
+                        game_data = jeux[0]
+                        return self._extract_screenshot_from_game(game_data, game_name)
+                    except ValueError:
+                        print(f"Invalid JSON response for {game_name}")
+                else:
+                    print(f"Failed to get screenshot by name for {game_name}")
+            return None
+        except Exception as e:
+            print(f"Error scraping screenshot by name for {game_name}: {e}")
             return None
