@@ -1,0 +1,1229 @@
+[
+  {
+    "canonical": "Amstrad - CPC",
+    "aliases": [
+      "amstrad - cpc",
+      "cpc"
+    ]
+  },
+  {
+    "canonical": "Amstrad - GX4000",
+    "aliases": [
+      "amstrad - gx4000",
+      "gx4000"
+    ]
+  },
+  {
+    "canonical": "Apple - II",
+    "aliases": [
+      "apple - ii",
+      "ii"
+    ]
+  },
+  {
+    "canonical": "Arduboy Inc - Arduboy",
+    "aliases": [
+      "arduboy",
+      "arduboy inc - arduboy"
+    ]
+  },
+  {
+    "canonical": "Atari - 2600",
+    "aliases": [
+      "2600",
+      "a2600",
+      "atari - 2600",
+      "atari 2600"
+    ]
+  },
+  {
+    "canonical": "Atari - 5200",
+    "aliases": [
+      "5200",
+      "a5200",
+      "atari - 5200",
+      "atari 5200"
+    ]
+  },
+  {
+    "canonical": "Atari - 7800",
+    "aliases": [
+      "7800",
+      "a7800",
+      "atari - 7800",
+      "atari 7800"
+    ]
+  },
+  {
+    "canonical": "Atari - 8-bit",
+    "aliases": [
+      "8 bit",
+      "8-bit",
+      "8bit",
+      "atari - 8-bit"
+    ]
+  },
+  {
+    "canonical": "Atari - 8-bit Family",
+    "aliases": [
+      "8 bit family",
+      "8-bit family",
+      "8bitfamily",
+      "atari - 8-bit family"
+    ]
+  },
+  {
+    "canonical": "Atari - Jaguar",
+    "aliases": [
+      "atari - jaguar",
+      "atari jaguar",
+      "jaguar"
+    ]
+  },
+  {
+    "canonical": "Atari - Lynx",
+    "aliases": [
+      "atari - lynx",
+      "atari lynx",
+      "lynx"
+    ]
+  },
+  {
+    "canonical": "Atari - ST",
+    "aliases": [
+      "atari - st",
+      "atari st",
+      "atarist",
+      "st"
+    ]
+  },
+  {
+    "canonical": "Atomiswave",
+    "aliases": [
+      "atomiswave"
+    ]
+  },
+  {
+    "canonical": "Bandai - WonderSwan",
+    "aliases": [
+      "bandai - wonderswan",
+      "bandai wonderswan",
+      "wonderswan",
+      "ws"
+    ]
+  },
+  {
+    "canonical": "Bandai - WonderSwan Color",
+    "aliases": [
+      "bandai - wonderswan color",
+      "wonderswan color",
+      "wonderswancolor",
+      "wsc"
+    ]
+  },
+  {
+    "canonical": "CHIP-8",
+    "aliases": [
+      "chip 8",
+      "chip-8",
+      "chip8"
+    ]
+  },
+  {
+    "canonical": "Cannonball",
+    "aliases": [
+      "cannonball"
+    ]
+  },
+  {
+    "canonical": "Casio - Loopy",
+    "aliases": [
+      "casio - loopy",
+      "loopy"
+    ]
+  },
+  {
+    "canonical": "Casio - PV-1000",
+    "aliases": [
+      "casio - pv-1000",
+      "pv 1000",
+      "pv-1000",
+      "pv1000"
+    ]
+  },
+  {
+    "canonical": "Cave Story",
+    "aliases": [
+      "cave story",
+      "cavestory"
+    ]
+  },
+  {
+    "canonical": "ChaiLove",
+    "aliases": [
+      "chailove"
+    ]
+  },
+  {
+    "canonical": "Coleco - ColecoVision",
+    "aliases": [
+      "coleco",
+      "coleco - colecovision",
+      "colecovision"
+    ]
+  },
+  {
+    "canonical": "Commodore - 64",
+    "aliases": [
+      "64",
+      "c64",
+      "cbm 64",
+      "commodore - 64",
+      "commodore 64",
+      "commodore64"
+    ]
+  },
+  {
+    "canonical": "Commodore - Amiga",
+    "aliases": [
+      "amiga",
+      "commodore - amiga",
+      "commodore amiga"
+    ]
+  },
+  {
+    "canonical": "Commodore - CD32",
+    "aliases": [
+      "cd32",
+      "commodore - cd32"
+    ]
+  },
+  {
+    "canonical": "Commodore - CDTV",
+    "aliases": [
+      "cdtv",
+      "commodore - cdtv"
+    ]
+  },
+  {
+    "canonical": "Commodore - PET",
+    "aliases": [
+      "commodore - pet",
+      "pet"
+    ]
+  },
+  {
+    "canonical": "Commodore - Plus-4",
+    "aliases": [
+      "commodore - plus-4",
+      "plus 4",
+      "plus-4",
+      "plus4"
+    ]
+  },
+  {
+    "canonical": "Commodore - VIC-20",
+    "aliases": [
+      "commodore - vic-20",
+      "vic 20",
+      "vic-20",
+      "vic20"
+    ]
+  },
+  {
+    "canonical": "DICE",
+    "aliases": [
+      "dice"
+    ]
+  },
+  {
+    "canonical": "DOOM",
+    "aliases": [
+      "doom"
+    ]
+  },
+  {
+    "canonical": "DOS",
+    "aliases": [
+      "dos"
+    ]
+  },
+  {
+    "canonical": "Dinothawr",
+    "aliases": [
+      "dinothawr"
+    ]
+  },
+  {
+    "canonical": "Elektor - TV Games Computer",
+    "aliases": [
+      "elektor - tv games computer",
+      "tv games computer",
+      "tvgamescomputer"
+    ]
+  },
+  {
+    "canonical": "Emerson - Arcadia 2001",
+    "aliases": [
+      "arcadia 2001",
+      "arcadia2001",
+      "emerson - arcadia 2001"
+    ]
+  },
+  {
+    "canonical": "Enterprise - 128",
+    "aliases": [
+      "128",
+      "enterprise - 128"
+    ]
+  },
+  {
+    "canonical": "Entex - Adventure Vision",
+    "aliases": [
+      "adventure vision",
+      "adventurevision",
+      "entex - adventure vision"
+    ]
+  },
+  {
+    "canonical": "Epoch - Cassette Vision",
+    "aliases": [
+      "cassette vision",
+      "cassettevision",
+      "epoch - cassette vision"
+    ]
+  },
+  {
+    "canonical": "Epoch - Super Cassette Vision",
+    "aliases": [
+      "epoch - super cassette vision",
+      "super cassette vision"
+    ]
+  },
+  {
+    "canonical": "FBNeo - Arcade Games",
+    "aliases": [
+      "arcade",
+      "arcade games",
+      "arcade neogeo",
+      "arcadegames",
+      "capcom cps1",
+      "capcom cps2",
+      "capcom cps3",
+      "capcom play system 1",
+      "capcom play system 2",
+      "capcom play system 3",
+      "cps1",
+      "cps2",
+      "cps3",
+      "fba",
+      "fbneo",
+      "fbneo - arcade games",
+      "final burn neo",
+      "neo geo",
+      "neo-geo",
+      "neogeo"
+    ]
+  },
+  {
+    "canonical": "Fairchild - Channel F",
+    "aliases": [
+      "channel f",
+      "channelf",
+      "fairchild - channel f"
+    ]
+  },
+  {
+    "canonical": "Flashback",
+    "aliases": [
+      "flashback"
+    ]
+  },
+  {
+    "canonical": "Funtech - Super Acan",
+    "aliases": [
+      "funtech - super acan",
+      "super acan",
+      "superacan"
+    ]
+  },
+  {
+    "canonical": "GCE - Vectrex",
+    "aliases": [
+      "gce - vectrex",
+      "gce vectrex",
+      "vectrex"
+    ]
+  },
+  {
+    "canonical": "GamePark - GP32",
+    "aliases": [
+      "gamepark - gp32",
+      "gp32"
+    ]
+  },
+  {
+    "canonical": "HBMAME",
+    "aliases": [
+      "hbmame"
+    ]
+  },
+  {
+    "canonical": "Handheld Electronic Game",
+    "aliases": [
+      "g&w",
+      "game & watch",
+      "game and watch",
+      "game watch",
+      "handheld electronic game"
+    ]
+  },
+  {
+    "canonical": "Hartung - Game Master",
+    "aliases": [
+      "game master",
+      "gamemaster",
+      "hartung - game master"
+    ]
+  },
+  {
+    "canonical": "Infocom - Z-Machine",
+    "aliases": [
+      "infocom - z-machine",
+      "z machine",
+      "z-machine",
+      "zmachine"
+    ]
+  },
+  {
+    "canonical": "Interton - VC 4000",
+    "aliases": [
+      "interton - vc 4000",
+      "vc 4000",
+      "vc4000"
+    ]
+  },
+  {
+    "canonical": "Jump 'n Bump",
+    "aliases": [
+      "jump 'n bump",
+      "jump n bump",
+      "jumpnbump"
+    ]
+  },
+  {
+    "canonical": "LeapFrog - Leapster Learning Game System",
+    "aliases": [
+      "leapfrog - leapster learning game system",
+      "leapster learning game system"
+    ]
+  },
+  {
+    "canonical": "LowRes NX",
+    "aliases": [
+      "lowres nx",
+      "lowresnx"
+    ]
+  },
+  {
+    "canonical": "Lutro",
+    "aliases": [
+      "lutro"
+    ]
+  },
+  {
+    "canonical": "MAME",
+    "aliases": [
+      "arcade mame",
+      "mame"
+    ]
+  },
+  {
+    "canonical": "MAME 2000",
+    "aliases": [
+      "mame 2000",
+      "mame2000"
+    ]
+  },
+  {
+    "canonical": "MAME 2003",
+    "aliases": [
+      "mame 2003",
+      "mame2003"
+    ]
+  },
+  {
+    "canonical": "MAME 2003-Plus",
+    "aliases": [
+      "mame 2003 plus",
+      "mame 2003-plus",
+      "mame2003plus"
+    ]
+  },
+  {
+    "canonical": "MAME 2010",
+    "aliases": [
+      "mame 2010",
+      "mame2010"
+    ]
+  },
+  {
+    "canonical": "MAME 2015",
+    "aliases": [
+      "mame 2015",
+      "mame2015"
+    ]
+  },
+  {
+    "canonical": "MAME 2016",
+    "aliases": [
+      "mame 2016",
+      "mame2016"
+    ]
+  },
+  {
+    "canonical": "Magnavox - Odyssey2",
+    "aliases": [
+      "magnavox - odyssey2",
+      "odyssey2"
+    ]
+  },
+  {
+    "canonical": "Mattel - Intellivision",
+    "aliases": [
+      "intellivision",
+      "intv",
+      "mattel - intellivision",
+      "mattel intellivision"
+    ]
+  },
+  {
+    "canonical": "MicroW8",
+    "aliases": [
+      "microw8"
+    ]
+  },
+  {
+    "canonical": "Microsoft - MSX",
+    "aliases": [
+      "microsoft - msx",
+      "msx"
+    ]
+  },
+  {
+    "canonical": "Microsoft - MSX2",
+    "aliases": [
+      "microsoft - msx2",
+      "msx2"
+    ]
+  },
+  {
+    "canonical": "Microsoft - Xbox",
+    "aliases": [
+      "microsoft - xbox",
+      "microsoft xbox",
+      "og xbox",
+      "xbox",
+      "xbox 1"
+    ]
+  },
+  {
+    "canonical": "MrBoom",
+    "aliases": [
+      "mrboom"
+    ]
+  },
+  {
+    "canonical": "NEC - PC Engine - TurboGrafx 16",
+    "aliases": [
+      "nec - pc engine - turbografx 16",
+      "pc engine",
+      "pce",
+      "tg-16",
+      "tg16",
+      "turbografx",
+      "turbografx 16",
+      "turbografx-16",
+      "turbografx16"
+    ]
+  },
+  {
+    "canonical": "NEC - PC Engine CD - TurboGrafx-CD",
+    "aliases": [
+      "nec - pc engine cd - turbografx-cd",
+      "pc engine cd",
+      "pce cd",
+      "pcecd",
+      "tg cd",
+      "tgcd",
+      "turbografx cd",
+      "turbografx-cd",
+      "turbografxcd"
+    ]
+  },
+  {
+    "canonical": "NEC - PC Engine SuperGrafx",
+    "aliases": [
+      "nec - pc engine supergrafx",
+      "pc engine supergrafx",
+      "pcenginesupergrafx",
+      "sgx",
+      "supergrafx"
+    ]
+  },
+  {
+    "canonical": "NEC - PC-8001 - PC-8801",
+    "aliases": [
+      "nec - pc-8001 - pc-8801",
+      "pc 8801",
+      "pc-8801",
+      "pc8801"
+    ]
+  },
+  {
+    "canonical": "NEC - PC-98",
+    "aliases": [
+      "nec - pc-98",
+      "pc 98",
+      "pc-98",
+      "pc98"
+    ]
+  },
+  {
+    "canonical": "NEC - PC-FX",
+    "aliases": [
+      "nec - pc-fx",
+      "nec pc-fx",
+      "pc fx",
+      "pc-fx",
+      "pcfx"
+    ]
+  },
+  {
+    "canonical": "Nintendo - Family Computer Disk System",
+    "aliases": [
+      "famicom disk system",
+      "family computer disk system",
+      "fds",
+      "nintendo - family computer disk system"
+    ]
+  },
+  {
+    "canonical": "Nintendo - Game Boy",
+    "aliases": [
+      "game boy",
+      "gameboy",
+      "gb",
+      "nintendo - game boy",
+      "nintendo game boy"
+    ]
+  },
+  {
+    "canonical": "Nintendo - Game Boy Advance",
+    "aliases": [
+      "game boy advance",
+      "gameboy advance",
+      "gameboyadvance",
+      "gba",
+      "nintendo - game boy advance",
+      "nintendo game boy advance"
+    ]
+  },
+  {
+    "canonical": "Nintendo - Game Boy Color",
+    "aliases": [
+      "game boy color",
+      "gameboy color",
+      "gameboycolor",
+      "gbc",
+      "nintendo - game boy color",
+      "nintendo game boy color"
+    ]
+  },
+  {
+    "canonical": "Nintendo - GameCube",
+    "aliases": [
+      "gamecube",
+      "gc",
+      "ngc",
+      "nintendo - gamecube",
+      "nintendo gamecube"
+    ]
+  },
+  {
+    "canonical": "Nintendo - Nintendo 3DS",
+    "aliases": [
+      "3ds",
+      "n3ds",
+      "new 3ds",
+      "new nintendo 3ds",
+      "nintendo - nintendo 3ds",
+      "nintendo 3ds",
+      "nintendo3ds"
+    ]
+  },
+  {
+    "canonical": "Nintendo - Nintendo 64",
+    "aliases": [
+      "n64",
+      "nintendo - nintendo 64",
+      "nintendo 64",
+      "nintendo64"
+    ]
+  },
+  {
+    "canonical": "Nintendo - Nintendo 64DD",
+    "aliases": [
+      "nintendo - nintendo 64dd",
+      "nintendo 64dd",
+      "nintendo64dd"
+    ]
+  },
+  {
+    "canonical": "Nintendo - Nintendo DS",
+    "aliases": [
+      "ds",
+      "nds",
+      "nintendo - nintendo ds",
+      "nintendo ds",
+      "nintendods"
+    ]
+  },
+  {
+    "canonical": "Nintendo - Nintendo DSi",
+    "aliases": [
+      "nintendo - nintendo dsi",
+      "nintendo dsi",
+      "nintendodsi"
+    ]
+  },
+  {
+    "canonical": "Nintendo - Nintendo Entertainment System",
+    "aliases": [
+      "famicom",
+      "family computer",
+      "fc",
+      "nes",
+      "nintendo - nintendo entertainment system",
+      "nintendo entertainment system"
+    ]
+  },
+  {
+    "canonical": "Nintendo - Pokemon Mini",
+    "aliases": [
+      "nintendo - pokemon mini",
+      "pokemini",
+      "pokemon mini",
+      "pokemon-mini",
+      "pokemonmini"
+    ]
+  },
+  {
+    "canonical": "Nintendo - Satellaview",
+    "aliases": [
+      "nintendo - satellaview",
+      "satellaview"
+    ]
+  },
+  {
+    "canonical": "Nintendo - Sufami Turbo",
+    "aliases": [
+      "nintendo - sufami turbo",
+      "sufami",
+      "sufami turbo",
+      "sufamiturbo"
+    ]
+  },
+  {
+    "canonical": "Nintendo - Super Nintendo Entertainment System",
+    "aliases": [
+      "nintendo - super nintendo entertainment system",
+      "sfc",
+      "snes",
+      "super famicom",
+      "super nes",
+      "super nintendo",
+      "super nintendo entertainment system"
+    ]
+  },
+  {
+    "canonical": "Nintendo - Virtual Boy",
+    "aliases": [
+      "nintendo - virtual boy",
+      "nintendo virtual boy",
+      "vb",
+      "virtual boy",
+      "virtualboy"
+    ]
+  },
+  {
+    "canonical": "Nintendo - Wii",
+    "aliases": [
+      "nintendo - wii",
+      "nintendo wii",
+      "wii"
+    ]
+  },
+  {
+    "canonical": "Nintendo - Wii (Digital)",
+    "aliases": [
+      "nintendo - wii (digital)",
+      "wii (digital)",
+      "wii digital",
+      "wiidigital"
+    ]
+  },
+  {
+    "canonical": "Nintendo - e-Reader",
+    "aliases": [
+      "e reader",
+      "e-reader",
+      "ereader",
+      "nintendo - e-reader"
+    ]
+  },
+  {
+    "canonical": "PICO-8",
+    "aliases": [
+      "pico 8",
+      "pico-8",
+      "pico8"
+    ]
+  },
+  {
+    "canonical": "Philips - CD-i",
+    "aliases": [
+      "cd i",
+      "cd-i",
+      "cdi",
+      "philips - cd-i"
+    ]
+  },
+  {
+    "canonical": "Philips - Videopac+",
+    "aliases": [
+      "philips - videopac+",
+      "videopac",
+      "videopac+"
+    ]
+  },
+  {
+    "canonical": "PuzzleScript",
+    "aliases": [
+      "puzzlescript"
+    ]
+  },
+  {
+    "canonical": "Quake",
+    "aliases": [
+      "quake"
+    ]
+  },
+  {
+    "canonical": "Quake II",
+    "aliases": [
+      "quake ii",
+      "quakeii"
+    ]
+  },
+  {
+    "canonical": "Quake III",
+    "aliases": [
+      "quake iii",
+      "quakeiii"
+    ]
+  },
+  {
+    "canonical": "RCA - Studio II",
+    "aliases": [
+      "rca - studio ii",
+      "studio ii",
+      "studioii"
+    ]
+  },
+  {
+    "canonical": "RPG Maker",
+    "aliases": [
+      "rpg maker",
+      "rpgmaker"
+    ]
+  },
+  {
+    "canonical": "Rick Dangerous",
+    "aliases": [
+      "rick dangerous",
+      "rickdangerous"
+    ]
+  },
+  {
+    "canonical": "SNK - Neo Geo",
+    "aliases": [
+      "neo geo",
+      "neogeo",
+      "snk - neo geo"
+    ]
+  },
+  {
+    "canonical": "SNK - Neo Geo CD",
+    "aliases": [
+      "neo geo cd",
+      "neocd",
+      "neogeocd",
+      "snk - neo geo cd"
+    ]
+  },
+  {
+    "canonical": "SNK - Neo Geo Pocket",
+    "aliases": [
+      "neo geo pocket",
+      "neogeo pocket",
+      "neogeopocket",
+      "ngp",
+      "snk - neo geo pocket"
+    ]
+  },
+  {
+    "canonical": "SNK - Neo Geo Pocket Color",
+    "aliases": [
+      "neo geo pocket color",
+      "neogeo pocket color",
+      "neogeopocketcolor",
+      "ngpc",
+      "snk - neo geo pocket color"
+    ]
+  },
+  {
+    "canonical": "ScummVM",
+    "aliases": [
+      "scummvm"
+    ]
+  },
+  {
+    "canonical": "Sega - 32X",
+    "aliases": [
+      "32x",
+      "sega - 32x",
+      "sega 32x"
+    ]
+  },
+  {
+    "canonical": "Sega - Dreamcast",
+    "aliases": [
+      "dc",
+      "dreamcast",
+      "sega - dreamcast",
+      "sega dreamcast"
+    ]
+  },
+  {
+    "canonical": "Sega - Game Gear",
+    "aliases": [
+      "game gear",
+      "gamegear",
+      "gg",
+      "sega - game gear",
+      "sega game gear"
+    ]
+  },
+  {
+    "canonical": "Sega - Master System - Mark III",
+    "aliases": [
+      "mark iii",
+      "markiii",
+      "master system",
+      "master system mark iii",
+      "sega - master system - mark iii",
+      "sega master system",
+      "sms"
+    ]
+  },
+  {
+    "canonical": "Sega - Mega Drive - Genesis",
+    "aliases": [
+      "genesis",
+      "md",
+      "mega drive",
+      "mega drive genesis",
+      "megadrive",
+      "sega - mega drive - genesis",
+      "sega genesis",
+      "sega mega drive"
+    ]
+  },
+  {
+    "canonical": "Sega - Mega-CD - Sega CD",
+    "aliases": [
+      "mcd",
+      "mega cd",
+      "mega cd sega cd",
+      "sega - mega-cd - sega cd",
+      "sega cd",
+      "segacd"
+    ]
+  },
+  {
+    "canonical": "Sega - Naomi",
+    "aliases": [
+      "naomi",
+      "sega - naomi"
+    ]
+  },
+  {
+    "canonical": "Sega - Naomi 2",
+    "aliases": [
+      "naomi 2",
+      "naomi2",
+      "sega - naomi 2"
+    ]
+  },
+  {
+    "canonical": "Sega - PICO",
+    "aliases": [
+      "pico",
+      "sega - pico"
+    ]
+  },
+  {
+    "canonical": "Sega - SG-1000",
+    "aliases": [
+      "sega - sg-1000",
+      "sega sg-1000",
+      "sega sg1000",
+      "sg 1000",
+      "sg-1000",
+      "sg1000"
+    ]
+  },
+  {
+    "canonical": "Sega - Saturn",
+    "aliases": [
+      "sat",
+      "saturn",
+      "sega - saturn",
+      "sega saturn",
+      "ss"
+    ]
+  },
+  {
+    "canonical": "Sharp - X1",
+    "aliases": [
+      "sharp - x1",
+      "sharp x68000",
+      "x1",
+      "x68000",
+      "x68k"
+    ]
+  },
+  {
+    "canonical": "Sharp - X68000",
+    "aliases": [
+      "sharp - x68000",
+      "x68000"
+    ]
+  },
+  {
+    "canonical": "Sinclair - ZX 81",
+    "aliases": [
+      "sinclair - zx 81",
+      "zx 81",
+      "zx81"
+    ]
+  },
+  {
+    "canonical": "Sinclair - ZX Spectrum",
+    "aliases": [
+      "sinclair - zx spectrum",
+      "zx spectrum",
+      "zxspectrum"
+    ]
+  },
+  {
+    "canonical": "Sinclair - ZX Spectrum +3",
+    "aliases": [
+      "sinclair - zx spectrum +3",
+      "zx spectrum +3",
+      "zx spectrum 3",
+      "zxspectrum3"
+    ]
+  },
+  {
+    "canonical": "Sony - PlayStation",
+    "aliases": [
+      "playstation",
+      "playstation 1",
+      "ps",
+      "ps1",
+      "psx",
+      "sony - playstation",
+      "sony playstation"
+    ]
+  },
+  {
+    "canonical": "Sony - PlayStation 2",
+    "aliases": [
+      "playstation 2",
+      "playstation2",
+      "ps2",
+      "sony - playstation 2",
+      "sony playstation 2"
+    ]
+  },
+  {
+    "canonical": "Sony - PlayStation 3",
+    "aliases": [
+      "playstation 3",
+      "playstation3",
+      "ps3",
+      "sony - playstation 3",
+      "sony playstation 3"
+    ]
+  },
+  {
+    "canonical": "Sony - PlayStation 3 (PSN)",
+    "aliases": [
+      "playstation 3 (psn)",
+      "playstation 3 psn",
+      "playstation3psn",
+      "sony - playstation 3 (psn)"
+    ]
+  },
+  {
+    "canonical": "Sony - PlayStation Portable",
+    "aliases": [
+      "playstation portable",
+      "psp",
+      "sony - playstation portable",
+      "sony psp"
+    ]
+  },
+  {
+    "canonical": "Sony - PlayStation Portable (PSN)",
+    "aliases": [
+      "playstation portable (psn)",
+      "playstation portable psn",
+      "sony - playstation portable (psn)"
+    ]
+  },
+  {
+    "canonical": "Sony - PlayStation Vita",
+    "aliases": [
+      "playstation vita",
+      "playstationvita",
+      "ps vita",
+      "psv",
+      "psvita",
+      "sony - playstation vita",
+      "sony playstation vita",
+      "sony ps vita",
+      "vita"
+    ]
+  },
+  {
+    "canonical": "Spectravideo - SVI-318 - SVI-328",
+    "aliases": [
+      "spectravideo - svi-318 - svi-328",
+      "svi 328",
+      "svi-328",
+      "svi328"
+    ]
+  },
+  {
+    "canonical": "TIC-80",
+    "aliases": [
+      "tic 80",
+      "tic-80",
+      "tic80"
+    ]
+  },
+  {
+    "canonical": "The 3DO Company - 3DO",
+    "aliases": [
+      "3do",
+      "3do interactive multiplayer",
+      "panasonic 3do",
+      "the 3do company - 3do"
+    ]
+  },
+  {
+    "canonical": "Thomson - MOTO",
+    "aliases": [
+      "moto",
+      "thomson - moto"
+    ]
+  },
+  {
+    "canonical": "Tiger - Game.com",
+    "aliases": [
+      "game com",
+      "game.com",
+      "gamecom",
+      "tiger - game.com"
+    ]
+  },
+  {
+    "canonical": "Tomb Raider",
+    "aliases": [
+      "tomb raider",
+      "tombraider"
+    ]
+  },
+  {
+    "canonical": "Uzebox",
+    "aliases": [
+      "uzebox"
+    ]
+  },
+  {
+    "canonical": "VTech - CreatiVision",
+    "aliases": [
+      "creativision",
+      "vtech - creativision"
+    ]
+  },
+  {
+    "canonical": "VTech - V.Smile",
+    "aliases": [
+      "v smile",
+      "v.smile",
+      "vsmile",
+      "vtech - v.smile"
+    ]
+  },
+  {
+    "canonical": "Videoton - TV-Computer",
+    "aliases": [
+      "tv computer",
+      "tv-computer",
+      "tvcomputer",
+      "videoton - tv-computer"
+    ]
+  },
+  {
+    "canonical": "Vircon32",
+    "aliases": [
+      "vircon32"
+    ]
+  },
+  {
+    "canonical": "WASM-4",
+    "aliases": [
+      "wasm 4",
+      "wasm-4",
+      "wasm4"
+    ]
+  },
+  {
+    "canonical": "Watara - Supervision",
+    "aliases": [
+      "supervision",
+      "watara - supervision"
+    ]
+  },
+  {
+    "canonical": "Wolfenstein 3D",
+    "aliases": [
+      "wolfenstein 3d",
+      "wolfenstein3d"
+    ]
+  }
+]
