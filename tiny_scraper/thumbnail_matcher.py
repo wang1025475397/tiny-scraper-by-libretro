@@ -7,6 +7,7 @@ import re
 import unicodedata
 import zipfile
 import zlib
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 from html.parser import HTMLParser
@@ -34,9 +35,11 @@ MAX_DIRECTORY_BYTES = 20 * 1024 * 1024
 SHOW_PROGRESS = True
 THUMBNAIL_JSON_DIR = Path(__file__).parent / "libretro_data/mediadata"
 METADATA_JSON_DIR = Path(__file__).parent / "libretro_data/metadata"
+MERGED_GAMES_JSON_PATH = Path(__file__).parent / "libretro_data/merged_games.json"
 BUILD_ALL_PLATFORM_JSON = False
 BUILD_JSON_IF_SYSTEM_MISSING = True
 SKIP_EXISTING_PLATFORM_JSON = True
+SCAN_WORKERS = 16
 
 forbidden = re.compile(
     r"[\u0022\u003c\u003e\u007c\u0000\u0001\u0002\u0003\u0004\u0005\u0006\u0007\u0008"
@@ -66,6 +69,7 @@ class GameMedia:
     name: str | None
     metadata: dict | None
     media: list[Match]
+    match_source: str = "crc"
 
 
 class LinkParser(HTMLParser):
@@ -223,6 +227,20 @@ def normalize_game_name(name: str, *, no_meta: bool = False, hack: bool = False)
 def normalize_local_name(name: str, *, no_meta: bool = False, hack: bool = False, before: str | None = None):
     safe_name = re.sub(forbidden, "_", extractbefore(before, name))
     return name, normalize_game_name(safe_name, no_meta=no_meta, hack=hack)
+
+
+def clean_lookup_name(name: str) -> str:
+    cleaned = game_name_from_filename(name)
+    cleaned = removeparenthesis(cleaned, "(", ")")
+    cleaned = removeparenthesis(cleaned, "（", "）")
+    cleaned = removeparenthesis(cleaned, "[", "]")
+    cleaned = removeparenthesis(cleaned, "【", "】")
+    return " ".join(cleaned.replace("_", " ").strip().split())
+
+
+def normalize_lookup_key(name: str) -> str:
+    normalized, no_space_name, _, _ = normalize_game_name(clean_lookup_name(name), no_meta=True)
+    return no_space_name or normalized.replace(" ", "")
 
 
 def normalize_remote_name(name: str, *, no_meta: bool = False, hack: bool = False):
@@ -411,6 +429,141 @@ def load_system_metadata_json(
         return json.load(file)
 
 
+def load_merged_games_json(path: str | Path = MERGED_GAMES_JSON_PATH) -> dict:
+    with Path(path).open("r", encoding="utf-8") as file:
+        return json.load(file)
+
+
+def iter_merged_games(merged_games: dict):
+    for item in merged_games.values():
+        if isinstance(item, list):
+            yield from item
+        else:
+            yield item
+
+
+def build_merged_game_name_index(merged_games: dict, system: str) -> tuple[list[str], dict[str, dict], dict[str, tuple[str, str, list[str], str]]]:
+    candidates = []
+    candidate_items = {}
+    for item in iter_merged_games(merged_games):
+        if item.get("platform") != system:
+            continue
+        for key in ("cn_cleaned_name", "cn_name"):
+            candidate = item.get(key)
+            if not candidate:
+                continue
+            candidate = str(candidate)
+            if candidate not in candidate_items:
+                candidates.append(candidate)
+                candidate_items[candidate] = item
+    return candidates, candidate_items, dict(normalize_remote_name(candidate, no_meta=True) for candidate in candidates)
+
+
+def score_merged_game_name(
+    filename: str,
+    system: str,
+    merged_games_path: str | Path = MERGED_GAMES_JSON_PATH,
+    merged_games: dict | None = None,
+    merged_game_index: tuple[list[str], dict[str, dict], dict[str, tuple[str, str, list[str], str]]] | None = None,
+) -> tuple[dict | None, float]:
+    lookup_name = clean_lookup_name(filename)
+    if merged_game_index:
+        candidates, candidate_items, remote_norms = merged_game_index
+    else:
+        merged_games = merged_games or load_merged_games_json(merged_games_path)
+        candidates, candidate_items, remote_norms = build_merged_game_name_index(merged_games, system)
+
+    if not candidates:
+        return None, 0.0
+
+    local_norms = dict([normalize_local_name(lookup_name, no_meta=True)])
+    scorer = TitleScorer(local_norms, remote_norms)
+    best_name, best_score = max(
+        ((candidate, scorer(lookup_name, candidate)) for candidate in candidates),
+        key=lambda item: item[1],
+    )
+    return candidate_items[best_name], best_score
+
+
+def find_merged_game_by_name(
+    filename: str,
+    system: str,
+    merged_games_path: str | Path = MERGED_GAMES_JSON_PATH,
+    merged_games: dict | None = None,
+    merged_game_index: tuple[list[str], dict[str, dict], dict[str, tuple[str, str, list[str], str]]] | None = None,
+) -> dict | None:
+    item, score = score_merged_game_name(filename, system, merged_games_path, merged_games, merged_game_index)
+    return item if score >= DEF_SCORE else None
+
+
+def merged_game_media_names(item: dict) -> list[str]:
+    names = []
+    for key in ("en_cleaned_name", "en_name"):
+        name = item.get(key)
+        if name and name not in names:
+            names.append(name)
+    return names
+
+
+def metadata_names(item: dict) -> list[str]:
+    names = []
+    for key in ("name", "rom_name"):
+        name = item.get(key)
+        if name:
+            name = game_name_from_filename(str(name))
+            if name not in names:
+                names.append(name)
+    return names
+
+
+def build_metadata_name_index(metadata: list[dict]) -> tuple[list[str], dict[str, dict], dict[str, tuple[str, str, list[str], str]]]:
+    candidates = []
+    candidate_items = {}
+    for item in metadata:
+        for candidate in metadata_names(item):
+            if candidate not in candidate_items:
+                candidates.append(candidate)
+                candidate_items[candidate] = item
+    return candidates, candidate_items, dict(normalize_remote_name(candidate, no_meta=True) for candidate in candidates)
+
+
+def find_metadata_by_name(
+    metadata: list[dict],
+    names: list[str],
+    metadata_name_index: tuple[list[str], dict[str, dict], dict[str, tuple[str, str, list[str], str]]] | None = None,
+) -> dict | None:
+    if metadata_name_index:
+        candidates, candidate_items, remote_norms = metadata_name_index
+    else:
+        candidates, candidate_items, remote_norms = build_metadata_name_index(metadata)
+
+    if not candidates:
+        return None
+
+    exact_matches = []
+    for name in names:
+        for candidate in candidates:
+            if normalize_lookup_key(name) == normalize_lookup_key(candidate):
+                exact_matches.append(candidate)
+    if exact_matches:
+        return candidate_items[min(exact_matches, key=len)]
+
+    best_item = None
+    best_score = 0.0
+    for name in names:
+        local_norms = dict([normalize_local_name(name, no_meta=True)])
+        scorer = TitleScorer(local_norms, remote_norms)
+        candidate_name, score = max(
+            ((candidate, scorer(name, candidate)) for candidate in candidates),
+            key=lambda item: item[1],
+        )
+        if score > best_score:
+            best_score = score
+            best_item = candidate_items[candidate_name]
+
+    return best_item if best_score >= DEF_SCORE else None
+
+
 def build_crc_metadata_map(metadata: list[dict]) -> dict[str, dict]:
     result = {}
     for item in metadata:
@@ -479,7 +632,75 @@ def find_media_by_crc(
         hack=hack,
         before=before,
     )
-    return GameMedia(path=Path(), crc=crc.upper(), name=name, metadata=metadata, media=media)
+    return GameMedia(path=Path(), crc=crc.upper(), name=name, metadata=metadata, media=media, match_source="crc")
+
+
+def find_game_media_from_indexes(
+    path: str | Path,
+    system: str,
+    system_metadata: list[dict],
+    metadata_map: dict[str, dict],
+    thumbnail_index: dict[str, dict[str, str]],
+    merged_games: dict,
+    thumbnail_match_index: tuple[list[str], dict[str, tuple[str, str, list[str], str]]] | None = None,
+    metadata_name_index: tuple[list[str], dict[str, dict], dict[str, tuple[str, str, list[str], str]]] | None = None,
+    merged_game_index: tuple[list[str], dict[str, dict], dict[str, tuple[str, str, list[str], str]]] | None = None,
+    *,
+    min_score: int = DEF_SCORE,
+    limit: int = 5,
+    no_meta: bool = False,
+    hack: bool = False,
+    before: str | None = None,
+) -> GameMedia:
+    path = Path(path)
+    crc = game_crc32(path)
+    metadata = metadata_map.get(crc)
+    name = None
+    media = []
+    match_source = "crc" if metadata else "none"
+
+    thumbnail_match_index = thumbnail_match_index or build_thumbnail_match_index(thumbnail_index, no_meta=no_meta, hack=hack)
+
+    if metadata:
+        name = metadata.get("name") or game_name_from_filename(metadata.get("rom_name", ""))
+        media = find_best_thumbnails_from_index(
+            name,
+            thumbnail_index,
+            thumbnail_match_index,
+            min_score=min_score,
+            limit=limit,
+            no_meta=no_meta,
+            hack=hack,
+            before=before,
+        )
+    else:
+        merged_game = find_merged_game_by_name(path.name, system, merged_games=merged_games, merged_game_index=merged_game_index)
+        if merged_game:
+            candidate_names = merged_game_media_names(merged_game)
+            metadata = find_metadata_by_name(system_metadata, candidate_names, metadata_name_index)
+            if metadata:
+                name = metadata.get("name") or game_name_from_filename(metadata.get("rom_name", ""))
+                match_source = "name"
+            elif candidate_names:
+                name = candidate_names[0]
+                match_source = "name"
+
+            for candidate_name in candidate_names:
+                candidate_media = find_best_thumbnails_from_index(
+                    candidate_name,
+                    thumbnail_index,
+                    thumbnail_match_index,
+                    min_score=min_score,
+                    limit=limit,
+                    no_meta=no_meta,
+                    hack=hack,
+                    before=before,
+                )
+                if candidate_media:
+                    media = candidate_media
+                    break
+
+    return GameMedia(path=path, crc=crc, name=name, metadata=metadata, media=media, match_source=match_source)
 
 
 def find_game_media(
@@ -494,27 +715,61 @@ def find_game_media(
     hack: bool = False,
     before: str | None = None,
 ) -> GameMedia:
-    path = Path(path)
-    metadata_map = build_crc_metadata_map(load_system_metadata_json(system, metadata_dir))
-    thumbnail_index = load_system_thumbnails_json(system, json_dir)
-    crc = game_crc32(path)
-    metadata = metadata_map.get(crc)
-    name = None
-    media = []
+    system_metadata = load_system_metadata_json(system, metadata_dir)
+    return find_game_media_from_indexes(
+        path,
+        system,
+        system_metadata,
+        build_crc_metadata_map(system_metadata),
+        load_system_thumbnails_json(system, json_dir),
+        load_merged_games_json(),
+        None,
+        None,
+        None,
+        min_score=min_score,
+        limit=limit,
+        no_meta=no_meta,
+        hack=hack,
+        before=before,
+    )
 
-    if metadata:
-        name = metadata.get("name") or game_name_from_filename(metadata.get("rom_name", ""))
-        media = find_best_thumbnails(
-            name,
+
+def scan_game_media_chunk(args) -> list[GameMedia]:
+    (
+        paths,
+        system,
+        system_metadata,
+        metadata_map,
+        thumbnail_index,
+        merged_games,
+        min_score,
+        limit,
+        no_meta,
+        hack,
+        before,
+    ) = args
+    metadata_name_index = build_metadata_name_index(system_metadata)
+    merged_game_index = build_merged_game_name_index(merged_games, system)
+    thumbnail_match_index = build_thumbnail_match_index(thumbnail_index, no_meta=no_meta, hack=hack)
+    return [
+        find_game_media_from_indexes(
+            path,
+            system,
+            system_metadata,
+            metadata_map,
             thumbnail_index,
+            merged_games,
+            thumbnail_match_index,
+            metadata_name_index,
+            merged_game_index,
             min_score=min_score,
             limit=limit,
             no_meta=no_meta,
             hack=hack,
             before=before,
         )
-
-    return GameMedia(path=path, crc=crc, name=name, metadata=metadata, media=media)
+        for path in paths
+    ]
 
 
 def scan_game_media(
@@ -530,32 +785,61 @@ def scan_game_media(
     no_meta: bool = False,
     hack: bool = False,
     before: str | None = None,
+    workers: int = 1,
 ) -> list[GameMedia]:
     directory = Path(directory)
     files = directory.rglob("*") if recursive else directory.glob("*")
     allowed_extensions = {ext.lower() for ext in extensions} if extensions else None
-    results = []
+    paths = [
+        path
+        for path in files
+        if path.is_file() and (not allowed_extensions or path.suffix.lower() in allowed_extensions)
+    ]
 
-    for path in files:
-        if not path.is_file():
-            continue
-        if allowed_extensions and path.suffix.lower() not in allowed_extensions:
-            continue
+    system_metadata = load_system_metadata_json(system, metadata_dir)
+    metadata_map = build_crc_metadata_map(system_metadata)
+    thumbnail_index = load_system_thumbnails_json(system, json_dir)
+    merged_games = load_merged_games_json()
 
-        results.append(
-            find_game_media(
-                path,
-                system,
-                metadata_dir,
-                json_dir,
-                min_score=min_score,
-                limit=limit,
-                no_meta=no_meta,
-                hack=hack,
-                before=before,
-            )
+    workers = max(1, min(workers, len(paths) or 1))
+    if workers <= 1:
+        return scan_game_media_chunk((
+            paths,
+            system,
+            system_metadata,
+            metadata_map,
+            thumbnail_index,
+            merged_games,
+            min_score,
+            limit,
+            no_meta,
+            hack,
+            before,
+        ))
+
+    chunk_size = (len(paths) + workers - 1) // workers
+    chunks = [paths[index : index + chunk_size] for index in range(0, len(paths), chunk_size)]
+    args = [
+        (
+            chunk,
+            system,
+            system_metadata,
+            metadata_map,
+            thumbnail_index,
+            merged_games,
+            min_score,
+            limit,
+            no_meta,
+            hack,
+            before,
         )
+        for chunk in chunks
+    ]
 
+    results = []
+    with ProcessPoolExecutor(max_workers=workers) as executor:
+        for chunk_results in executor.map(scan_game_media_chunk, args):
+            results.extend(chunk_results)
     return results
 
 
@@ -621,6 +905,17 @@ def build_remote_names(thumbnail_index: dict[str, dict[str, str]]) -> set[str]:
     return remote_names
 
 
+def build_thumbnail_match_index(
+    thumbnail_index: dict[str, dict[str, str]],
+    *,
+    no_meta: bool = False,
+    hack: bool = False,
+) -> tuple[list[str], dict[str, tuple[str, str, list[str], str]]]:
+    remote_names = list(build_remote_names(thumbnail_index))
+    remote_norms = dict(normalize_remote_name(name, no_meta=no_meta, hack=hack) for name in remote_names)
+    return remote_names, remote_norms
+
+
 def game_name_from_filename(filename: str) -> str:
     path = Path(filename)
     if path.suffix and re.fullmatch(r"\.[A-Za-z0-9]{1,7}", path.suffix):
@@ -628,9 +923,10 @@ def game_name_from_filename(filename: str) -> str:
     return filename
 
 
-def find_best_thumbnails(
+def find_best_thumbnails_from_index(
     filename: str,
     thumbnail_index: dict[str, dict[str, str]],
+    thumbnail_match_index: tuple[list[str], dict[str, tuple[str, str, list[str], str]]],
     *,
     min_score: int = DEF_SCORE,
     limit: int = 5,
@@ -639,12 +935,11 @@ def find_best_thumbnails(
     before: str | None = None,
 ) -> list[Match]:
     game_name = game_name_from_filename(filename)
-    remote_names = build_remote_names(thumbnail_index)
+    remote_names, remote_norms = thumbnail_match_index
     if not remote_names:
         return []
 
     local_norms = dict([normalize_local_name(game_name, no_meta=no_meta, hack=hack, before=before)])
-    remote_norms = dict(normalize_remote_name(name, no_meta=no_meta, hack=hack) for name in remote_names)
     scorer = TitleScorer(local_norms, remote_norms, hack=hack)
 
     scored = sorted(
@@ -664,6 +959,28 @@ def find_best_thumbnails(
         }
         matches.append(Match(name=remote_name, score=score, urls=urls))
     return matches
+
+
+def find_best_thumbnails(
+    filename: str,
+    thumbnail_index: dict[str, dict[str, str]],
+    *,
+    min_score: int = DEF_SCORE,
+    limit: int = 5,
+    no_meta: bool = False,
+    hack: bool = False,
+    before: str | None = None,
+) -> list[Match]:
+    return find_best_thumbnails_from_index(
+        filename,
+        thumbnail_index,
+        build_thumbnail_match_index(thumbnail_index, no_meta=no_meta, hack=hack),
+        min_score=min_score,
+        limit=limit,
+        no_meta=no_meta,
+        hack=hack,
+        before=before,
+    )
 
 
 def find_image_for_filename(
@@ -689,9 +1006,151 @@ def find_image_for_filename(
     )
 
 
-def run_example():
+class ThumbnailMatcher:
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
+
+    def __init__(self):
+        if self._initialized:
+            return
+        self._thumbnail_cache = {}
+        self._metadata_cache = {}
+        self._merged_games = None
+        self._thumbnail_match_index_cache = {}
+        self._metadata_name_index_cache = {}
+        self._merged_game_index_cache = {}
+        self._initialized = True
+
+    @classmethod
+    def instance(cls) -> "ThumbnailMatcher":
+        return cls()
+
+    def load_thumbnails(self, system: str, json_dir: str | Path = THUMBNAIL_JSON_DIR) -> dict[str, dict[str, str]]:
+        key = (system, Path(json_dir))
+        if key not in self._thumbnail_cache:
+            self._thumbnail_cache[key] = load_system_thumbnails_json(system, json_dir)
+        return self._thumbnail_cache[key]
+
+    def load_metadata(self, system: str, metadata_dir: str | Path = METADATA_JSON_DIR) -> list[dict]:
+        key = (system, Path(metadata_dir))
+        if key not in self._metadata_cache:
+            self._metadata_cache[key] = load_system_metadata_json(system, metadata_dir)
+        return self._metadata_cache[key]
+
+    def load_merged_games(self) -> dict:
+        if self._merged_games is None:
+            self._merged_games = load_merged_games_json()
+        return self._merged_games
+
+    def thumbnail_match_index(self, system: str, json_dir: str | Path = THUMBNAIL_JSON_DIR, *, no_meta: bool = False, hack: bool = False):
+        key = (system, Path(json_dir), no_meta, hack)
+        if key not in self._thumbnail_match_index_cache:
+            self._thumbnail_match_index_cache[key] = build_thumbnail_match_index(
+                self.load_thumbnails(system, json_dir),
+                no_meta=no_meta,
+                hack=hack,
+            )
+        return self._thumbnail_match_index_cache[key]
+
+    def metadata_name_index(self, system: str, metadata_dir: str | Path = METADATA_JSON_DIR):
+        key = (system, Path(metadata_dir))
+        if key not in self._metadata_name_index_cache:
+            self._metadata_name_index_cache[key] = build_metadata_name_index(self.load_metadata(system, metadata_dir))
+        return self._metadata_name_index_cache[key]
+
+    def merged_game_index(self, system: str):
+        if system not in self._merged_game_index_cache:
+            self._merged_game_index_cache[system] = build_merged_game_name_index(self.load_merged_games(), system)
+        return self._merged_game_index_cache[system]
+
+    def build_system_thumbnails_json(self, system: str, json_dir: str | Path = THUMBNAIL_JSON_DIR, *, address: str = ADDRESS, thumb_dirs: list[str] | None = None):
+        result = build_system_thumbnails_json(system, json_dir, address=address, thumb_dirs=thumb_dirs)
+        self._thumbnail_cache[(system, Path(json_dir))] = result
+        self._thumbnail_match_index_cache = {
+            key: value for key, value in self._thumbnail_match_index_cache.items() if key[0] != system or key[1] != Path(json_dir)
+        }
+        return result
+
+    def build_all_json(self, json_dir: str | Path = THUMBNAIL_JSON_DIR, *, address: str = ADDRESS, thumb_dirs: list[str] | None = None, skip_existing: bool = True):
+        return build_all_json(json_dir, address=address, thumb_dirs=thumb_dirs, skip_existing=skip_existing)
+
+    def find_in_json(self, filename: str, system: str, json_dir: str | Path = THUMBNAIL_JSON_DIR, *, min_score: int = DEF_SCORE, limit: int = 5, no_meta: bool = False, hack: bool = False, before: str | None = None) -> list[Match]:
+        return find_best_thumbnails_from_index(
+            filename,
+            self.load_thumbnails(system, json_dir),
+            self.thumbnail_match_index(system, json_dir, no_meta=no_meta, hack=hack),
+            min_score=min_score,
+            limit=limit,
+            no_meta=no_meta,
+            hack=hack,
+            before=before,
+        )
+
+    def find_or_build_json(self, filename: str, system: str, json_dir: str | Path = THUMBNAIL_JSON_DIR, *, address: str = ADDRESS, min_score: int = DEF_SCORE, limit: int = 5, no_meta: bool = False, hack: bool = False, before: str | None = None) -> list[Match]:
+        path = system_json_path(system, json_dir)
+        if not path.exists():
+            self.build_system_thumbnails_json(system, json_dir, address=address)
+        thumbnail_index = self.load_thumbnails(system, json_dir)
+        if not thumbnail_index:
+            thumbnail_index = self.build_system_thumbnails_json(system, json_dir, address=address)
+        return find_best_thumbnails_from_index(
+            filename,
+            thumbnail_index,
+            self.thumbnail_match_index(system, json_dir, no_meta=no_meta, hack=hack),
+            min_score=min_score,
+            limit=limit,
+            no_meta=no_meta,
+            hack=hack,
+            before=before,
+        )
+
+    def find_game_media(self, path: str | Path, system: str, metadata_dir: str | Path = METADATA_JSON_DIR, json_dir: str | Path = THUMBNAIL_JSON_DIR, *, min_score: int = DEF_SCORE, limit: int = 5, no_meta: bool = False, hack: bool = False, before: str | None = None) -> GameMedia:
+        metadata = self.load_metadata(system, metadata_dir)
+        return find_game_media_from_indexes(
+            path,
+            system,
+            metadata,
+            build_crc_metadata_map(metadata),
+            self.load_thumbnails(system, json_dir),
+            self.load_merged_games(),
+            self.thumbnail_match_index(system, json_dir, no_meta=no_meta, hack=hack),
+            self.metadata_name_index(system, metadata_dir),
+            self.merged_game_index(system),
+            min_score=min_score,
+            limit=limit,
+            no_meta=no_meta,
+            hack=hack,
+            before=before,
+        )
+
+    def scan_game_media(self, directory: str | Path, system: str, metadata_dir: str | Path = METADATA_JSON_DIR, json_dir: str | Path = THUMBNAIL_JSON_DIR, *, recursive: bool = True, extensions: set[str] | None = None, min_score: int = DEF_SCORE, limit: int = 5, no_meta: bool = False, hack: bool = False, before: str | None = None, workers: int = 1) -> list[GameMedia]:
+        return scan_game_media(
+            directory,
+            system,
+            metadata_dir,
+            json_dir,
+            recursive=recursive,
+            extensions=extensions,
+            min_score=min_score,
+            limit=limit,
+            no_meta=no_meta,
+            hack=hack,
+            before=before,
+            workers=workers,
+        )
+
+
+matcher = ThumbnailMatcher.instance()
+
+
+def run_example1():
     if BUILD_ALL_PLATFORM_JSON:
-        systems = build_all_json(
+        systems = matcher.build_all_json(
             THUMBNAIL_JSON_DIR,
             address=ADDRESS,
             skip_existing=SKIP_EXISTING_PLATFORM_JSON,
@@ -699,7 +1158,7 @@ def run_example():
         print(f"Checked {len(systems)} platform JSON files in {THUMBNAIL_JSON_DIR}")
 
     if BUILD_JSON_IF_SYSTEM_MISSING:
-        matches = find_or_build_json(
+        matches = matcher.find_or_build_json(
             FILENAME,
             SYSTEM,
             THUMBNAIL_JSON_DIR,
@@ -711,7 +1170,7 @@ def run_example():
             before=BEFORE,
         )
     else:
-        matches = find_in_json(
+        matches = matcher.find_in_json(
             FILENAME,
             SYSTEM,
             THUMBNAIL_JSON_DIR,
@@ -732,13 +1191,13 @@ def run_example():
             print(f"  {thumb_type}: {url}")
 
 
-def verify_scan_game_media():
-    rom_path = Path(r"F:\roms\gb")
-    system = "Nintendo - Game Boy"
+def run_example2():
+    rom_path = Path(r"F:\Roms\sfc")
+    system = "Nintendo - Super Nintendo Entertainment System"
 
     if rom_path.is_file():
         results = [
-            find_game_media(
+            matcher.find_game_media(
                 rom_path,
                 system,
                 limit=1,
@@ -746,32 +1205,60 @@ def verify_scan_game_media():
             )
         ]
     else:
-        results = scan_game_media(
+        results = matcher.scan_game_media(
             rom_path,
             system,
-            extensions={".gb", ".zip"},
+            extensions={".sfc", ".zip"},
             limit=1,
             no_meta=True,
+            workers=SCAN_WORKERS,
         )
 
-    for item in results:
+    def print_matched_item(item: GameMedia):
         print(f"file: {item.path}")
         print(f"crc: {item.crc}")
+        print(f"match_source: {item.match_source}")
         print(f"game: {item.name or '未匹配到 metadata'}")
         if item.metadata:
             print("metadata:")
             print(json.dumps(item.metadata, ensure_ascii=False, indent=2))
-        if not item.media:
-            print("media: 未匹配到")
         for match in item.media:
             print(f"media: {match.name} ({match.score:.1f})")
             for thumb_type, url in match.urls.items():
                 print(f"  {thumb_type}: {url}")
         print()
 
+    crc_matched = []
+    name_matched = []
+    unmatched = []
+    for item in results:
+        if not item.media:
+            unmatched.append(item)
+        elif item.match_source == "crc":
+            crc_matched.append(item)
+        else:
+            name_matched.append(item)
+
+    for item in crc_matched:
+        print_matched_item(item)
+
+    if name_matched:
+        print("非 CRC 匹配到的文件:")
+        for item in name_matched:
+            print_matched_item(item)
+
+    if unmatched:
+        print("未匹配到的文件:")
+        for item in unmatched:
+            print(f"file: {item.path}")
+            print(f"crc: {item.crc}")
+            print(f"match_source: {item.match_source}")
+            print(f"game: {item.name or '未匹配到 metadata'}")
+            print()
+
 
 def main():
-    verify_scan_game_media()
+    run_example2()
 
 
 if __name__ == "__main__":
