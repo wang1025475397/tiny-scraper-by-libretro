@@ -1,7 +1,11 @@
-
 .venv
 Roms
 __pycache__
 pyrightconfig.json
 new_systems.xml
 tiny-scraper.zip
+debug_app_out/
+cli_scraper.py
+tiny_scraper.sh
+libretro_data/
+*.code-workspace

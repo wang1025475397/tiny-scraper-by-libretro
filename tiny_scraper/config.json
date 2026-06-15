@@ -1,6 +1,9 @@
 {
     "user": "",
     "password": "",
-    "media_type": "ss",
-    "region": "wor"
+    "media_type": "box-2D",
+    "region": "wor",
+    "resize": false,
+    "preferred_sources": ["libretro", "screenscraper"],
+    "thumbnail_priority": ["Named_Boxarts", "Named_Snaps", "Named_Titles"]
 }

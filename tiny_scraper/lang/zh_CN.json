@@ -17,5 +17,7 @@
   "Errors:": "失败:",
   "No roms found in TF": "未找到游戏保存在 TF",
   "Missing media:": "缺少预览图:",
-  "Roms:": "游戏数量:"
+  "Roms:": "游戏数量:",
+  "Retrying": "正在重试",
+  "ROM(s) with screenscraper...": "个游戏使用 screenscraper..."
 }

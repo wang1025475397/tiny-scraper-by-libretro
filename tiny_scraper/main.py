@@ -1,5 +1,4 @@
 import sys
-import app
 from pathlib import Path
 
 board_mapping = {
@@ -24,7 +23,15 @@ system_lang = system_list[int(lang_info)]
 
 
 def main():
-
+    # Initialize graphics system first with hardware info
+    import graphic as gr
+    gr.draw_start(hw_info)
+    gr.imgMain = gr.create_image()
+    gr.draw_active(gr.imgMain)
+    
+    # Then import app after graphics initialization
+    import app
+    
     path = sys.argv[1]
     app.start(path)
 

@@ -17,5 +17,7 @@
   "Errors:": "ミス:",
   "No roms found in TF": "にROMが見つかりません TF",
   "Missing media:": "メディアが見つかりません:",
-  "Roms:": "ゲーム数:"
+  "Roms:": "ゲーム数:",
+  "Retrying": "再試行中",
+  "ROM(s) with screenscraper...": "ROM(s) を screenscraper で再試行..."
 }

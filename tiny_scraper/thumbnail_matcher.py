@@ -22,8 +22,6 @@ MAX_SCORE = 100
 THUMB_DIRS = ["Named_Boxarts", "Named_Titles", "Named_Snaps", "Named_Logos"]
 
 # 直接修改这些变量即可运行脚本示例
-FILENAME = "Super Mario Bros. 3"
-SYSTEM = "Nintendo - Nintendo Entertainment System"
 MIN_SCORE = DEF_SCORE
 LIMIT = 5
 NO_META = True
@@ -33,9 +31,14 @@ REQUEST_TIMEOUT = 15
 READ_CHUNK_SIZE = 64 * 1024
 MAX_DIRECTORY_BYTES = 20 * 1024 * 1024
 SHOW_PROGRESS = True
-THUMBNAIL_JSON_DIR = Path(__file__).parent / "libretro_data/mediadata"
-METADATA_JSON_DIR = Path(__file__).parent / "libretro_data/metadata"
-MERGED_GAMES_JSON_PATH = Path(__file__).parent / "libretro_data/merged_games.json"
+
+_PROJECT_ROOT = Path(__file__).parent.parent
+THUMBNAIL_JSON_DIR = _PROJECT_ROOT / "tiny_scraper/libretro_data/mediadata"
+METADATA_JSON_DIR = _PROJECT_ROOT / "tiny_scraper/libretro_data/metadata"
+MERGED_GAMES_JSON_PATH = _PROJECT_ROOT / "tiny_scraper/libretro_data/merged_games.json"
+PLATFORM_ALIASES_JSON_PATH = _PROJECT_ROOT / "tiny_scraper/libretro_data/platform-aliases.json"
+
+
 BUILD_ALL_PLATFORM_JSON = False
 BUILD_JSON_IF_SYSTEM_MISSING = True
 SKIP_EXISTING_PLATFORM_JSON = True
@@ -434,6 +437,33 @@ def load_merged_games_json(path: str | Path = MERGED_GAMES_JSON_PATH) -> dict:
         return json.load(file)
 
 
+def normalize_platform_alias(name: str) -> str:
+    name = name.strip().lower().replace("_", " ").replace("-", " ")
+    return re.sub(r"\s+", " ", name)
+
+
+def load_platform_aliases(path: str | Path = PLATFORM_ALIASES_JSON_PATH) -> dict[str, str]:
+    with Path(path).open("r", encoding="utf-8") as file:
+        platforms = json.load(file)
+
+    aliases = {}
+    for platform in platforms:
+        canonical = platform["canonical"]
+        aliases[normalize_platform_alias(canonical)] = canonical
+        for alias in platform.get("aliases", []):
+            aliases[normalize_platform_alias(str(alias))] = canonical
+    return aliases
+
+
+def infer_system_from_game_path(path: str | Path, aliases_path: str | Path = PLATFORM_ALIASES_JSON_PATH) -> str:
+    path = Path(path)
+    platform_name = path.parent.name if path.suffix else path.name
+    system = load_platform_aliases(aliases_path).get(normalize_platform_alias(platform_name))
+    if not system:
+        raise ValueError(f"无法根据游戏文件夹名称识别系统: {platform_name}")
+    return system
+
+
 def iter_merged_games(merged_games: dict):
     for item in merged_games.values():
         if isinstance(item, list):
@@ -492,8 +522,34 @@ def find_merged_game_by_name(
     merged_games: dict | None = None,
     merged_game_index: tuple[list[str], dict[str, dict], dict[str, tuple[str, str, list[str], str]]] | None = None,
 ) -> dict | None:
+    # 首先尝试相似度匹配
     item, score = score_merged_game_name(filename, system, merged_games_path, merged_games, merged_game_index)
-    return item if score >= DEF_SCORE else None
+    if score >= DEF_SCORE:
+        return item
+
+    # 备用策略：直接用清理后的名称作为 cn_name 查找（用于匹配 "46亿年物语 遥远的伊甸" -> "46亿年物语"）
+    if merged_game_index:
+        candidates, candidate_items, remote_norms = merged_game_index
+    else:
+        merged_games = merged_games or load_merged_games_json(merged_games_path)
+        candidates, candidate_items, remote_norms = build_merged_game_name_index(merged_games, system)
+
+    lookup_name = clean_lookup_name(filename)
+    # 尝试精确匹配 cn_name
+    if lookup_name in candidate_items:
+        return candidate_items[lookup_name]
+
+    # 尝试作为前缀匹配
+    for key in candidates:
+        if key and lookup_name.startswith(key):
+            return candidate_items[key]
+
+    # 尝试作为后缀匹配
+    for key in candidates:
+        if key and key in lookup_name:
+            return candidate_items[key]
+
+    return None
 
 
 def merged_game_media_names(item: dict) -> list[str]:
@@ -621,7 +677,7 @@ def find_media_by_crc(
     if not metadata:
         return None
 
-    name = metadata.get("name") or game_name_from_filename(metadata.get("rom_name", ""))
+    name = metadata.get("name") or game_name_from_filename(metadata.get("rom_name") or "")
     media = find_in_json(
         name,
         system,
@@ -662,7 +718,7 @@ def find_game_media_from_indexes(
     thumbnail_match_index = thumbnail_match_index or build_thumbnail_match_index(thumbnail_index, no_meta=no_meta, hack=hack)
 
     if metadata:
-        name = metadata.get("name") or game_name_from_filename(metadata.get("rom_name", ""))
+        name = metadata.get("name") or game_name_from_filename(metadata.get("rom_name") or "")
         media = find_best_thumbnails_from_index(
             name,
             thumbnail_index,
@@ -679,7 +735,7 @@ def find_game_media_from_indexes(
             candidate_names = merged_game_media_names(merged_game)
             metadata = find_metadata_by_name(system_metadata, candidate_names, metadata_name_index)
             if metadata:
-                name = metadata.get("name") or game_name_from_filename(metadata.get("rom_name", ""))
+                name = metadata.get("name") or game_name_from_filename(metadata.get("rom_name") or "")
                 match_source = "name"
             elif candidate_names:
                 name = candidate_names[0]
@@ -705,7 +761,7 @@ def find_game_media_from_indexes(
 
 def find_game_media(
     path: str | Path,
-    system: str,
+    system: str | None = None,
     metadata_dir: str | Path = METADATA_JSON_DIR,
     json_dir: str | Path = THUMBNAIL_JSON_DIR,
     *,
@@ -715,13 +771,17 @@ def find_game_media(
     hack: bool = False,
     before: str | None = None,
 ) -> GameMedia:
-    system_metadata = load_system_metadata_json(system, metadata_dir)
+    system = system or infer_system_from_game_path(path)
+    # 通过平台别名规范化系统名称
+    aliases = load_platform_aliases()
+    normalized_system = aliases.get(normalize_platform_alias(system), system)
+    system_metadata = load_system_metadata_json(normalized_system, metadata_dir)
     return find_game_media_from_indexes(
         path,
-        system,
+        normalized_system,
         system_metadata,
         build_crc_metadata_map(system_metadata),
-        load_system_thumbnails_json(system, json_dir),
+        load_system_thumbnails_json(normalized_system, json_dir),
         load_merged_games_json(),
         None,
         None,
@@ -774,7 +834,7 @@ def scan_game_media_chunk(args) -> list[GameMedia]:
 
 def scan_game_media(
     directory: str | Path,
-    system: str,
+    system: str | None = None,
     metadata_dir: str | Path = METADATA_JSON_DIR,
     json_dir: str | Path = THUMBNAIL_JSON_DIR,
     *,
@@ -788,6 +848,10 @@ def scan_game_media(
     workers: int = 1,
 ) -> list[GameMedia]:
     directory = Path(directory)
+    system = system or infer_system_from_game_path(directory)
+    # 通过平台别名规范化系统名称
+    aliases = load_platform_aliases()
+    normalized_system = aliases.get(normalize_platform_alias(system), system)
     files = directory.rglob("*") if recursive else directory.glob("*")
     allowed_extensions = {ext.lower() for ext in extensions} if extensions else None
     paths = [
@@ -796,16 +860,16 @@ def scan_game_media(
         if path.is_file() and (not allowed_extensions or path.suffix.lower() in allowed_extensions)
     ]
 
-    system_metadata = load_system_metadata_json(system, metadata_dir)
+    system_metadata = load_system_metadata_json(normalized_system, metadata_dir)
     metadata_map = build_crc_metadata_map(system_metadata)
-    thumbnail_index = load_system_thumbnails_json(system, json_dir)
+    thumbnail_index = load_system_thumbnails_json(normalized_system, json_dir)
     merged_games = load_merged_games_json()
 
     workers = max(1, min(workers, len(paths) or 1))
     if workers <= 1:
         return scan_game_media_chunk((
             paths,
-            system,
+            normalized_system,
             system_metadata,
             metadata_map,
             thumbnail_index,
@@ -822,7 +886,7 @@ def scan_game_media(
     args = [
         (
             chunk,
-            system,
+            normalized_system,
             system_metadata,
             metadata_map,
             thumbnail_index,
@@ -1109,18 +1173,22 @@ class ThumbnailMatcher:
             before=before,
         )
 
-    def find_game_media(self, path: str | Path, system: str, metadata_dir: str | Path = METADATA_JSON_DIR, json_dir: str | Path = THUMBNAIL_JSON_DIR, *, min_score: int = DEF_SCORE, limit: int = 5, no_meta: bool = False, hack: bool = False, before: str | None = None) -> GameMedia:
-        metadata = self.load_metadata(system, metadata_dir)
+    def find_game_media(self, path: str | Path, system: str | None = None, metadata_dir: str | Path = METADATA_JSON_DIR, json_dir: str | Path = THUMBNAIL_JSON_DIR, *, min_score: int = DEF_SCORE, limit: int = 5, no_meta: bool = False, hack: bool = False, before: str | None = None) -> GameMedia:
+        system = system or infer_system_from_game_path(path)
+        # 通过平台别名规范化系统名称
+        aliases = load_platform_aliases()
+        normalized_system = aliases.get(normalize_platform_alias(system), system)
+        metadata = self.load_metadata(normalized_system, metadata_dir)
         return find_game_media_from_indexes(
             path,
-            system,
+            normalized_system,
             metadata,
             build_crc_metadata_map(metadata),
-            self.load_thumbnails(system, json_dir),
+            self.load_thumbnails(normalized_system, json_dir),
             self.load_merged_games(),
-            self.thumbnail_match_index(system, json_dir, no_meta=no_meta, hack=hack),
-            self.metadata_name_index(system, metadata_dir),
-            self.merged_game_index(system),
+            self.thumbnail_match_index(normalized_system, json_dir, no_meta=no_meta, hack=hack),
+            self.metadata_name_index(normalized_system, metadata_dir),
+            self.merged_game_index(normalized_system),
             min_score=min_score,
             limit=limit,
             no_meta=no_meta,
@@ -1128,7 +1196,7 @@ class ThumbnailMatcher:
             before=before,
         )
 
-    def scan_game_media(self, directory: str | Path, system: str, metadata_dir: str | Path = METADATA_JSON_DIR, json_dir: str | Path = THUMBNAIL_JSON_DIR, *, recursive: bool = True, extensions: set[str] | None = None, min_score: int = DEF_SCORE, limit: int = 5, no_meta: bool = False, hack: bool = False, before: str | None = None, workers: int = 1) -> list[GameMedia]:
+    def scan_game_media(self, directory: str | Path, system: str | None = None, metadata_dir: str | Path = METADATA_JSON_DIR, json_dir: str | Path = THUMBNAIL_JSON_DIR, *, recursive: bool = True, extensions: set[str] | None = None, min_score: int = DEF_SCORE, limit: int = 5, no_meta: bool = False, hack: bool = False, before: str | None = None, workers: int = 1) -> list[GameMedia]:
         return scan_game_media(
             directory,
             system,
@@ -1149,6 +1217,8 @@ matcher = ThumbnailMatcher.instance()
 
 
 def run_example1():
+    FILENAME = "Super Mario Bros. 3"
+    SYSTEM = "Nintendo - Nintendo Entertainment System"
     if BUILD_ALL_PLATFORM_JSON:
         systems = matcher.build_all_json(
             THUMBNAIL_JSON_DIR,
@@ -1192,14 +1262,12 @@ def run_example1():
 
 
 def run_example2():
-    rom_path = Path(r"F:\Roms\sfc")
-    system = "Nintendo - Super Nintendo Entertainment System"
+    rom_path = Path(r"F:\Roms\gbc")
 
     if rom_path.is_file():
         results = [
             matcher.find_game_media(
                 rom_path,
-                system,
                 limit=1,
                 no_meta=True,
             )
@@ -1207,8 +1275,7 @@ def run_example2():
     else:
         results = matcher.scan_game_media(
             rom_path,
-            system,
-            extensions={".sfc", ".zip"},
+            extensions={".gbc", ".zip"},
             limit=1,
             no_meta=True,
             workers=SCAN_WORKERS,

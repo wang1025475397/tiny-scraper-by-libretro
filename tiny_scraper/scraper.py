@@ -2,6 +2,7 @@ import os
 import binascii
 import json
 import base64
+import time
 from pathlib import Path
 import ssl
 from urllib.request import urlopen, Request
@@ -9,6 +10,28 @@ import urllib.parse
 from systems import get_system_extension, systems
 
 DEFAULT_REGION = 'wor'
+
+def retry_on_network_error(max_retries=3, delay=2):
+    """Decorator to retry on network errors"""
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            last_exception = None
+            for attempt in range(max_retries):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    if "Temporary failure in name resolution" in str(e) or \
+                       "Connection refused" in str(e) or \
+                       "timed out" in str(e).lower():
+                        last_exception = e
+                        if attempt < max_retries - 1:
+                            print(f"Network error, retrying {attempt + 1}/{max_retries}...")
+                            time.sleep(delay * (attempt + 1))
+                            continue
+                    raise
+            raise last_exception
+        return wrapper
+    return decorator
 
 
 class Rom:
@@ -30,6 +53,8 @@ class Scraper:
         self.media_type = "ss"
         self.region = DEFAULT_REGION
         self.resize = False
+        self.preferred_sources = ["libretro", "screenscraper"]
+        self.thumbnail_priority = ["Named_Snaps", "Named_Titles", "Named_Boxarts"]
 
     def load_config_from_json(self, filepath) -> bool:
         if not os.path.exists(filepath):
@@ -43,6 +68,8 @@ class Scraper:
             self.media_type = config.get("media_type") or "ss"
             self.region = config.get("region") or "wor"
             self.resize = config.get("resize") is True
+            self.preferred_sources = config.get("preferred_sources") or ["libretro", "screenscraper"]
+            self.thumbnail_priority = config.get("thumbnail_priority") or ["Named_Snaps", "Named_Titles", "Named_Boxarts"]
         return True
 
     def get_crc32_from_file(self, rom, chunk_size = 65536):
@@ -125,7 +152,7 @@ class Scraper:
         if screenshot_url:
             ctx = self._get_ssl_context()
             img_request = Request(screenshot_url)
-            with urlopen(img_request, context=ctx) as img_response:
+            with urlopen(img_request, context=ctx, timeout=30) as img_response:
                 if img_response.headers.get("Content-Type") == "image/png":
                     return img_response.read()
                 else:
@@ -138,12 +165,13 @@ class Scraper:
         self, crc: str, game_name: str, system_id: int
     ) -> bytes | None:
         """总入口：先按hash刮削，失败则按名称刮削"""
-        result = self.scrape_screenshot_by_hash(crc, game_name, system_id)
-        if result is not None:
-            return result
-        print(f"Hash scrape failed for {game_name}, trying by name...")
-        return self.scrape_screenshot_by_name(game_name, system_id)
+        return self.scrape_screenshot_by_hash(crc, game_name, system_id)
+        # if result is not None:
+        #     return result
+        # print(f"Hash scrape failed for {game_name}, trying by name...")
+        # return self.scrape_screenshot_by_name(game_name, system_id)
 
+    @retry_on_network_error(max_retries=3, delay=2)
     def scrape_screenshot_by_hash(
         self, crc: str, game_name: str, system_id: int
     ) -> bytes | None:
@@ -158,7 +186,7 @@ class Scraper:
         print(f"Scraping screenshot by hash for {game_name}...")
         request = Request(url)
         try:
-            with urlopen(request, context=ctx) as response:
+            with urlopen(request, context=ctx, timeout=30) as response:
                 if response.status == 200:
                     try:
                         data = json.loads(response.read())
@@ -173,9 +201,12 @@ class Scraper:
                     print(f"Failed to get screenshot for {game_name}")
             return None
         except Exception as e:
-            print(f"Error scraping screenshot by hash for {game_name}: {e}")
+            print(f"[ERROR] Hash scrape failed for: {game_name}")
+            print(f"[URL] {url}")
+            print(f"[EXCEPTION] {type(e).__name__}: {e}")
             return None
 
+    @retry_on_network_error(max_retries=3, delay=2)
     def scrape_screenshot_by_name(
         self, game_name: str, system_id: int
     ) -> bytes | None:
@@ -190,7 +221,7 @@ class Scraper:
         print(f"Scraping screenshot by name for {game_name}...")
         request = Request(url)
         try:
-            with urlopen(request, context=ctx) as response:
+            with urlopen(request, context=ctx, timeout=30) as response:
                 if response.status == 200:
                     try:
                         data = json.loads(response.read())

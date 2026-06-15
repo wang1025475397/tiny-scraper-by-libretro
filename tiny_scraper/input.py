@@ -24,19 +24,22 @@ mapping = {
 
 def check():
 	global type, code, codeName, codeDown, value, valueDown
-	with open("/dev/input/event1", "rb") as f:
-		while True:
-			event = f.read(24)
-			
-			if event:
-				(tv_sec, tv_usec, type, kcode, kvalue) = struct.unpack('llHHI', event)
-				if kvalue != 0:
-					if kvalue != 1:
-						kvalue = -1
-					code = kcode
-					codeName = mapping.get(code, str(code))
-					value = kvalue						
-					return
+	try:
+		with open("/dev/input/event4", "rb") as f:
+			while True:
+				event = f.read(24)
+				
+				if event:
+					(tv_sec, tv_usec, type, kcode, kvalue) = struct.unpack('llHHI', event)
+					if kvalue != 0:
+						if kvalue != 1:
+							kvalue = -1
+						code = kcode
+						codeName = mapping.get(code, str(code))
+						value = kvalue						
+						return
+	except FileNotFoundError:
+		return
 
 def key(keyCodeName, keyValue = 99):
 	global code, codeName, value

@@ -1,3 +1,6 @@
+import ssl
+import concurrent.futures
+import threading
 from pathlib import Path
 from typing import List, Optional
 from main import hw_info, system_lang
@@ -11,6 +14,8 @@ import socket
 from anbernic import Anbernic
 from scraper import Scraper
 from systems import get_system_id
+from thumbnail_matcher import matcher as thumbnail_matcher
+from thumbnail_matcher import find_merged_game_by_name, merged_game_media_names, load_platform_aliases, normalize_platform_alias
 from PIL import Image
 from io import BytesIO
 
@@ -24,6 +29,10 @@ scraper = Scraper()
 skip_input_check = False
 missing_media_cache = {}
 cached_storage_path = None
+
+# 多线程刮削时的全局锁，用于保护控制台输出和状态计数
+scrape_lock = threading.Lock()
+scrape_progress = {"success": 0, "failure": 0, "completed": 0}
 
 x_size, y_size, max_elem = screen_resolutions.get(hw_info, (640, 480, 11))
 
@@ -203,9 +212,11 @@ def load_roms_menu() -> None:
         gr.draw_paint()
         rom = roms_without_image[roms_selected_position]
         rom.set_crc(scraper.get_crc32_from_file(system_path / rom.filename))
-        screenshot = scraper.scrape_screenshot(
-            game_name=rom.name, crc=rom.crc, system_id=system_id
+        
+        screenshot = scrape_with_sources(
+            rom.name, rom.crc, system_id, system_path / rom.filename, selected_system
         )
+        
         if screenshot:
             img_path: Path = imgs_folder / f"{rom.name}.png"
             save_screenshot(img_path, screenshot)
@@ -221,7 +232,7 @@ def load_roms_menu() -> None:
         scraped = True
         exit_menu = True
     elif input.key("START"):
-        progress: int = 1
+        progress: int = 0
         success: int = 0
         failure: int = 0
         gr.draw_log(
@@ -230,27 +241,111 @@ def load_roms_menu() -> None:
             outline=gr.colorBlueD1,
         )
         gr.draw_paint()
-        for rom in roms_without_image:
-            if rom.name not in imgs_files:
-                rom.set_crc(scraper.get_crc32_from_file(system_path / rom.filename))
-                screenshot: Optional[bytes] = scraper.scrape_screenshot(
-                    game_name=rom.name, crc=rom.crc, system_id=system_id
-                )
-                if screenshot:
-                    img_path: Path = imgs_folder / f"{rom.name}.png"
-                    save_screenshot(img_path, screenshot)
-                    print(f"Done scraping {rom.name}. Saved file to {img_path}")
-                    success += 1
-                else:
-                    print(f"Failed to get screenshot for {rom.name}")
-                    failure += 1
-                progress += 1
+        
+        # 根据首选数据源类型选择处理方式
+        primary_source = scraper.preferred_sources[0] if scraper.preferred_sources else "libretro"
+        
+        if primary_source == "libretro":
+            # libretro 数据源：使用多线程（最多3个线程）+ screenscraper 单线程回退
+            roms_to_scrape = [rom for rom in roms_without_image if rom.name not in imgs_files]
+            total_roms = len(roms_to_scrape)
+            
+            # 第一阶段：libretro 多线程并行处理
+            failed_roms = []  # 收集 libretro 失败的 ROM
+            
+            with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+                # 提交所有 libretro 刮削任务
+                futures = {
+                    executor.submit(
+                        scrape_single_rom,
+                        rom,
+                        system_id,
+                        system_path,
+                        imgs_folder,
+                        selected_system,
+                        "libretro"
+                    ): rom for rom in roms_to_scrape
+                }
+                
+                # 处理完成的任务
+                for future in concurrent.futures.as_completed(futures):
+                    rom = futures[future]
+                    rom_name, success_flag = future.result()
+                    if success_flag:
+                        success += 1
+                    else:
+                        failed_roms.append(rom)  # 收集失败的 ROM，用于回退处理
+                        failure += 1  # 先计入失败
+                    progress += 1
+                    gr.draw_log(
+                        f"{translator.translate('Scraping')} {progress} {translator.translate('of')} {total_roms}",
+                        fill=gr.colorBlue,
+                        outline=gr.colorBlueD1,
+                    )
+                    gr.draw_paint()
+            
+            # 第二阶段：screenscraper 单线程处理失败的 ROM（回退机制）
+            if failed_roms and "screenscraper" in scraper.preferred_sources:
+                print(f"Retrying {len(failed_roms)} ROM(s) with screenscraper...")
+                # 显示第二阶段开始的提示
                 gr.draw_log(
-                    f"{translator.translate('Scraping')} {progress} {translator.translate('of')} {len(roms_without_image)}",
-                    fill=gr.colorBlue,
-                    outline=gr.colorBlueD1,
+                    f"{translator.translate('Retrying')} {len(failed_roms)} {translator.translate('ROM(s) with screenscraper...')}",
+                    fill=gr.colorYellow,
+                    outline=gr.colorYellowD1,
                 )
                 gr.draw_paint()
+                
+                for i, rom in enumerate(failed_roms, 1):
+                    rom.set_crc(scraper.get_crc32_from_file(system_path / rom.filename))
+                    
+                    # 使用 screenscraper 数据源（单线程）
+                    screenshot: Optional[bytes] = scrape_with_sources(
+                        rom.name, rom.crc, system_id, system_path / rom.filename, selected_system,
+                        source_filter="screenscraper"
+                    )
+                    
+                    if screenshot:
+                        img_path: Path = imgs_folder / f"{rom.name}.png"
+                        save_screenshot(img_path, screenshot)
+                        print(f"Done scraping {rom.name} with screenscraper. Saved file to {img_path}")
+                        success += 1
+                        failure -= 1  # 从失败中减去，因为成功了
+                    else:
+                        print(f"Failed to get screenshot for {rom.name} with screenscraper")
+                    
+                    # 更新第二阶段的进度显示
+                    gr.draw_log(
+                        f"{translator.translate('Retrying')} {i} {translator.translate('of')} {len(failed_roms)}",
+                        fill=gr.colorYellow,
+                        outline=gr.colorYellowD1,
+                    )
+                    gr.draw_paint()
+        else:
+            # screenscraper 数据源：保持单线程
+            for rom in roms_without_image:
+                if rom.name not in imgs_files:
+                    rom.set_crc(scraper.get_crc32_from_file(system_path / rom.filename))
+                    
+                    screenshot: Optional[bytes] = scrape_with_sources(
+                        rom.name, rom.crc, system_id, system_path / rom.filename, selected_system
+                    )
+                    
+                    if screenshot:
+                        img_path: Path = imgs_folder / f"{rom.name}.png"
+                        save_screenshot(img_path, screenshot)
+                        print(f"Done scraping {rom.name}. Saved file to {img_path}")
+                        success += 1
+                    else:
+                        print(f"Failed to get screenshot for {rom.name}")
+                        failure += 1
+                    progress += 1
+                    gr.draw_log(
+                        f"{translator.translate('Scraping')} {progress} {translator.translate('of')} {len(roms_without_image)}",
+                        fill=gr.colorBlue,
+                        outline=gr.colorBlueD1,
+                    )
+                    gr.draw_paint()
+        
         gr.draw_log(
             f"{translator.translate('Scraping completed! Success:')} {success} {translator.translate('Errors:')} {failure}",
             fill=gr.colorBlue,
@@ -319,6 +414,107 @@ def load_roms_menu() -> None:
     button_circle((button_x, button_y), "M", f"{translator.translate('Exit')}")
 
     gr.draw_paint()
+
+def scrape_with_sources(game_name: str, crc: str, system_id: int, rom_path: Path, system: str, source_filter: str = None) -> bytes | None:
+    """根据配置的数据源优先级依次尝试获取截图
+    
+    Args:
+        source_filter: 可选，限制只使用特定数据源（"libretro" 或 "screenscraper"）
+                      为 None 时使用所有配置的数据源
+    """
+    # 先将系统别名转换为规范名称
+    aliases = load_platform_aliases()
+    normalized_system = aliases.get(normalize_platform_alias(system), system)
+    
+    # 先从 merged_games.json 中查找游戏名称
+    merged_game = find_merged_game_by_name(game_name, normalized_system)
+    if merged_game:
+        media_names = merged_game_media_names(merged_game)
+        if media_names:
+            # 使用找到的英文名称
+            search_name = media_names[0]
+            print(f"Found merged game: {game_name} -> {search_name}")
+        else:
+            search_name = game_name
+    else:
+        search_name = game_name
+    
+    for source in scraper.preferred_sources:
+        # 如果设置了数据源过滤器，跳过不匹配的数据源
+        if source_filter and source != source_filter:
+            continue
+            
+        if source == "libretro":
+            print(f"Trying libretro for {search_name}...")
+            screenshot = scrape_screenshot_from_thumbnail_matcher(search_name, rom_path, system)
+            if screenshot:
+                return screenshot
+        elif source == "screenscraper":
+            print(f"Trying screenscraper for {search_name}...")
+            screenshot = scraper.scrape_screenshot(game_name=search_name, crc=crc, system_id=system_id)
+            if screenshot:
+                return screenshot
+        else:
+            print(f"Unknown source: {source}, skipping...")
+    
+    return None
+
+
+def scrape_single_rom(rom, system_id, system_path, imgs_folder, selected_system, source_type) -> tuple[str, bool]:
+    """单个ROM刮削处理函数，供多线程调用"""
+    rom.set_crc(scraper.get_crc32_from_file(system_path / rom.filename))
+    
+    # 使用 source_filter 参数确保只使用指定的数据源
+    # 当 source_type 为 "libretro" 时，不会回退到 screenscraper
+    screenshot = scrape_with_sources(
+        rom.name, rom.crc, system_id, system_path / rom.filename, selected_system,
+        source_filter=source_type  # 关键：限制只使用指定数据源
+    )
+    
+    # 使用锁保护控制台输出
+    with scrape_lock:
+        if screenshot:
+            img_path = imgs_folder / f"{rom.name}.png"
+            save_screenshot(img_path, screenshot)
+            print(f"Done scraping {rom.name}. Saved file to {img_path}")
+            return (rom.name, True)
+        else:
+            print(f"Failed to get screenshot for {rom.name}")
+            return (rom.name, False)
+
+def scrape_screenshot_from_thumbnail_matcher(game_name: str, rom_path: Path, system: str) -> bytes | None:
+    """从 thumbnail_matcher 数据源获取截图"""
+    try:
+        game_media = thumbnail_matcher.find_game_media(rom_path, system)
+        if game_media and game_media.media:
+            best_match = game_media.media[0]
+            
+            url = None
+            for thumb_type in scraper.thumbnail_priority:
+                if thumb_type in best_match.urls:
+                    url = best_match.urls[thumb_type]
+                    break
+            
+            if not url:
+                return None
+            
+            print(f"Found thumbnail match: {best_match.name} (score: {best_match.score:.1f})")
+            print(f"Downloading from: {url}")
+            
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            
+            from urllib.request import Request, urlopen
+            request = Request(url, headers={"User-Agent": "thumbnail-matcher/1.0"})
+            with urlopen(request, context=ctx, timeout=15) as response:
+                return response.read()
+        else:
+            print(f"No media found for {game_name} in thumbnail_matcher")
+            return None
+    except Exception as e:
+        print(f"Error scraping from thumbnail_matcher for {game_name}: {e}")
+        return None
 
 def save_screenshot(img_path: Path, screenshot: bytes) -> None:
     if scraper.resize:
