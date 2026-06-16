@@ -14,7 +14,7 @@ import socket
 from anbernic import Anbernic
 from scraper import Scraper
 from systems import get_system_id
-from thumbnail_matcher import matcher as thumbnail_matcher
+from thumbnail_matcher import matcher as thumbnail_matcher, DEF_SCORE as THUMBNAIL_DEF_SCORE
 from thumbnail_matcher import find_merged_game_by_name, merged_game_media_names, load_platform_aliases, normalize_platform_alias
 from PIL import Image
 from io import BytesIO
@@ -454,13 +454,17 @@ def scrape_with_sources(game_name: str, crc: str, system_id: int, rom_path: Path
         start_time = time.time()
         
         if source == "libretro":
-            screenshot = scrape_screenshot_from_thumbnail_matcher(search_name, rom_path, system)
+            result = scrape_screenshot_from_thumbnail_matcher(search_name, rom_path, system)
             elapsed = time.time() - start_time
-            if screenshot:
-                print(f"[OK] {source.upper()} succeeded in {elapsed:.1f}s")
-                return screenshot
+            if result:
+                screenshot, score = result
+                if screenshot:
+                    print(f"[OK] {source.upper()} succeeded in {elapsed:.1f}s (score: {score:.1f})")
+                    return screenshot
+                else:
+                    print(f"[FAIL] {source.upper()} failed in {elapsed:.1f}s (score: {score:.1f})")
             else:
-                print(f"[FAIL] {source.upper()} failed in {elapsed:.1f}s")
+                print(f"[FAIL] {source.upper()} failed in {elapsed:.1f}s (score: 0.0)")
         elif source == "screenscraper":
             screenshot = scraper.scrape_screenshot(game_name=search_name, crc=crc, system_id=system_id)
             elapsed = time.time() - start_time
@@ -499,10 +503,22 @@ def scrape_single_rom(rom, system_id, system_path, imgs_folder, selected_system,
             print(f"Failed to get screenshot for {rom.name}")
             return (rom.name, False)
 
-def scrape_screenshot_from_thumbnail_matcher(game_name: str, rom_path: Path, system: str) -> bytes | None:
-    """从 thumbnail_matcher 数据源获取截图"""
+def scrape_screenshot_from_thumbnail_matcher(game_name: str, rom_path: Path, system: str) -> tuple[bytes, float] | tuple[None, float]:
+    """从 thumbnail_matcher 数据源获取截图，返回(图片bytes, 相似度分数)或(None, 分数)"""
     try:
-        game_media = thumbnail_matcher.find_game_media(rom_path, system)
+        # 传入 min_score=0 获取所有匹配（即使低于阈值也要显示分数）
+        game_media = thumbnail_matcher.find_game_media(rom_path, system, min_score=0)
+        
+        # 获取最佳匹配分数（即使低于阈值）
+        score = 0.0
+        if game_media and game_media.media:
+            score = game_media.media[0].score
+        
+        # 检查分数是否达到阈值
+        if score < THUMBNAIL_DEF_SCORE:
+            print(f"[MATCH] {game_media.media[0].name if game_media and game_media.media else game_name} (score: {score:.1f}) - Score below threshold ({THUMBNAIL_DEF_SCORE}), skipping download")
+            return (None, score)
+        
         if game_media and game_media.media:
             best_match = game_media.media[0]
             
@@ -513,10 +529,11 @@ def scrape_screenshot_from_thumbnail_matcher(game_name: str, rom_path: Path, sys
                     break
             
             if not url:
-                return None
+                print(f"[MATCH] {best_match.name} (score: {score:.1f}) - No suitable URL found")
+                return (None, score)
             
-            print(f"Found thumbnail match: {best_match.name} (score: {best_match.score:.1f})")
-            print(f"Downloading from: {url}")
+            print(f"[MATCH] {best_match.name} (score: {score:.1f})")
+            print(f"[URL] {url}")
             
             ctx = ssl.create_default_context()
             ctx.check_hostname = False
@@ -525,13 +542,13 @@ def scrape_screenshot_from_thumbnail_matcher(game_name: str, rom_path: Path, sys
             from urllib.request import Request, urlopen
             request = Request(url, headers={"User-Agent": "thumbnail-matcher/1.0"})
             with urlopen(request, context=ctx, timeout=15) as response:
-                return response.read()
+                return (response.read(), score)
         else:
-            print(f"No media found for {game_name} in thumbnail_matcher")
-            return None
+            print(f"[INFO] No media found for {game_name} (best score: {score:.1f})")
+            return (None, score)
     except Exception as e:
-        print(f"Error scraping from thumbnail_matcher for {game_name}: {e}")
-        return None
+        print(f"[ERROR] thumbnail_matcher failed: {e}")
+        return (None, 0.0)
 
 def save_screenshot(img_path: Path, screenshot: bytes) -> None:
     if scraper.resize:

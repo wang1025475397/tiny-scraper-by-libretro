@@ -1,9 +1,12 @@
 #!/bin/bash
 
-. /mnt/mod/ctrl/configs/functions &>/dev/null 2>&1
-progdir=$(cd $(dirname "$0"); pwd)
+progdir="$(cd $(dirname "$0") || exit; pwd)/tiny_scraper"
 
-program="python3 ${progdir}/tiny_scraper/main.py ${progdir}/tiny_scraper/config.json"
-log_file="${progdir}/tiny_scraper/log.txt"
+export PYSDL2_DLL_PATH="/usr/lib"
 
-$program > "$log_file" 2>&1
+program="python3 -u ${progdir}/main.py ${progdir}/config.json"
+log_file="${progdir}/log.txt"
+
+$program >> "$log_file" 2>&1
+
+exit 0

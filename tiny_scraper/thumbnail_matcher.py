@@ -57,6 +57,23 @@ almost_symbols_pattern = re.compile(r"[^\w\s,']")
 roman_bounded_numeral = re.compile(r"\b[IVXLCDM]+\b")
 roman_numerals = {"I": 1, "V": 5, "X": 10, "L": 50, "C": 100, "D": 500, "M": 1000}
 
+# 全局缓存
+_json_cache: dict[str, any] = {}
+_cache_lock = threading.Lock() if "threading" in dir() else None
+
+def _load_json_with_cache(path: Path) -> dict:
+    """带缓存的 JSON 加载"""
+    key = str(path)
+    if key not in _json_cache:
+        with path.open("r", encoding="utf-8") as f:
+            _json_cache[key] = json.load(f)
+    return _json_cache[key]
+
+def clear_json_cache():
+    """清除 JSON 缓存"""
+    global _json_cache
+    _json_cache = {}
+
 
 @dataclass(frozen=True)
 class Match:
@@ -420,21 +437,18 @@ def load_system_thumbnails_json(
     system: str,
     json_dir: str | Path = THUMBNAIL_JSON_DIR,
 ) -> dict[str, dict[str, str]]:
-    with system_json_path(system, json_dir).open("r", encoding="utf-8") as file:
-        return json.load(file)
+    return _load_json_with_cache(system_json_path(system, json_dir))
 
 
 def load_system_metadata_json(
     system: str,
     metadata_dir: str | Path = METADATA_JSON_DIR,
 ) -> list[dict]:
-    with system_json_path(system, metadata_dir).open("r", encoding="utf-8") as file:
-        return json.load(file)
+    return _load_json_with_cache(system_json_path(system, metadata_dir))
 
 
 def load_merged_games_json(path: str | Path = MERGED_GAMES_JSON_PATH) -> dict:
-    with Path(path).open("r", encoding="utf-8") as file:
-        return json.load(file)
+    return _load_json_with_cache(Path(path))
 
 
 def normalize_platform_alias(name: str) -> str:
@@ -443,11 +457,10 @@ def normalize_platform_alias(name: str) -> str:
 
 
 def load_platform_aliases(path: str | Path = PLATFORM_ALIASES_JSON_PATH) -> dict[str, str]:
-    with Path(path).open("r", encoding="utf-8") as file:
-        platforms = json.load(file)
-
+    raw = _load_json_with_cache(Path(path))
+    
     aliases = {}
-    for platform in platforms:
+    for platform in raw:
         canonical = platform["canonical"]
         aliases[normalize_platform_alias(canonical)] = canonical
         for alias in platform.get("aliases", []):
