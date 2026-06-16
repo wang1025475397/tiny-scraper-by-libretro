@@ -17,7 +17,7 @@ from urllib.parse import quote, unquote
 from urllib.request import Request, urlopen
 
 ADDRESS = "https://thumbnails.libretro.com"
-DEF_SCORE = 80
+DEF_SCORE = 70
 MAX_SCORE = 100
 THUMB_DIRS = ["Named_Boxarts", "Named_Titles", "Named_Snaps", "Named_Logos"]
 

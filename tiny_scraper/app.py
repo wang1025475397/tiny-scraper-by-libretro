@@ -422,6 +422,11 @@ def scrape_with_sources(game_name: str, crc: str, system_id: int, rom_path: Path
         source_filter: 可选，限制只使用特定数据源（"libretro" 或 "screenscraper"）
                       为 None 时使用所有配置的数据源
     """
+    print(f"{'='*60}")
+    print(f"Scraping: {game_name}")
+    print(f"CRC: {crc}")
+    print(f"System: {system}")
+    
     # 先将系统别名转换为规范名称
     aliases = load_platform_aliases()
     normalized_system = aliases.get(normalize_platform_alias(system), system)
@@ -431,32 +436,44 @@ def scrape_with_sources(game_name: str, crc: str, system_id: int, rom_path: Path
     if merged_game:
         media_names = merged_game_media_names(merged_game)
         if media_names:
-            # 使用找到的英文名称
             search_name = media_names[0]
-            print(f"Found merged game: {game_name} -> {search_name}")
+            print(f"[INFO] Found merged game: {game_name} -> {search_name}")
         else:
             search_name = game_name
     else:
         search_name = game_name
     
+    available_sources = [s for s in scraper.preferred_sources if not source_filter or s == source_filter]
+    print(f"[INFO] Sources to try: {available_sources}")
+    
     for source in scraper.preferred_sources:
-        # 如果设置了数据源过滤器，跳过不匹配的数据源
         if source_filter and source != source_filter:
             continue
             
+        print(f"[TRY] {source.upper()} for '{search_name}'...")
+        start_time = time.time()
+        
         if source == "libretro":
-            print(f"Trying libretro for {search_name}...")
             screenshot = scrape_screenshot_from_thumbnail_matcher(search_name, rom_path, system)
+            elapsed = time.time() - start_time
             if screenshot:
+                print(f"[OK] {source.upper()} succeeded in {elapsed:.1f}s")
                 return screenshot
+            else:
+                print(f"[FAIL] {source.upper()} failed in {elapsed:.1f}s")
         elif source == "screenscraper":
-            print(f"Trying screenscraper for {search_name}...")
             screenshot = scraper.scrape_screenshot(game_name=search_name, crc=crc, system_id=system_id)
+            elapsed = time.time() - start_time
             if screenshot:
+                print(f"[OK] {source.upper()} succeeded in {elapsed:.1f}s")
                 return screenshot
+            else:
+                print(f"[FAIL] {source.upper()} failed in {elapsed:.1f}s")
         else:
-            print(f"Unknown source: {source}, skipping...")
+            print(f"[SKIP] Unknown source: {source}")
     
+    print(f"[END] All sources failed for {game_name}")
+    print(f"{'='*60}")
     return None
 
 

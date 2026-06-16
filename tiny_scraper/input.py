@@ -1,4 +1,6 @@
 import struct
+import os
+import re
 
 code = 0
 codeName = ""
@@ -22,10 +24,31 @@ mapping = {
 	115: "V-",
 }
 
+def find_gamepad_device():
+	"""找 Handlers 中包含 js 的手柄设备对应的 event 路径"""
+	try:
+		with open("/proc/bus/input/devices", "r") as f:
+			content = f.read()
+	except FileNotFoundError:
+		return None
+
+	for block in content.strip().split("\n\n"):
+		handlers_match = re.search(r"H: Handlers=([^\n]+)", block)
+		if handlers_match and "js" in handlers_match.group(1):
+			event_match = re.search(r"\b(event\d+)\b", block)
+			if event_match:
+				path = f"/dev/input/{event_match.group(1)}"
+				if os.path.exists(path):
+					return path
+	return None
+
 def check():
 	global type, code, codeName, codeDown, value, valueDown
+	dev = find_gamepad_device()
+	if not dev:
+		return
 	try:
-		with open("/dev/input/event4", "rb") as f:
+		with open(dev, "rb") as f:
 			while True:
 				event = f.read(24)
 				

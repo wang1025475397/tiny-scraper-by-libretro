@@ -23,6 +23,11 @@ system_lang = system_list[int(lang_info)]
 
 
 def main():
+    # Clear log file on startup
+    log_path = Path(__file__).parent / "log.txt"
+    if log_path.exists():
+        log_path.write_text("")
+    
     # Initialize graphics system first with hardware info
     import graphic as gr
     gr.draw_start(hw_info)
