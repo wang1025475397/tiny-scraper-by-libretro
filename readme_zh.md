@@ -1,11 +1,15 @@
 # Tiny Scraper
 
+[English](./readme.md)
+
 > 本项目是从 [Julioevm/tiny-scraper](https://github.com/Julioevm/tiny-scraper) 拉取的分支
 
 ---
 
 ## 新增功能
 
+- **界面重构**：全新设计的用户界面，支持多种屏幕分辨率（RG28xx、RG34xx、RGcubeXX）
+- **RGDS Linux 支持**：新增对 RGDS 系列 Linux 设备（Knulli / Rocknix）的支持，不再局限于 Anbernic 设备
 - **Libretro 数据源支持**：新增 Libretro Thumbnails 作为数据源，支持从本地缓存的缩略图库获取游戏封面
 - **多数据源自动回退**：支持配置多个数据源，优先使用 Libretro，失败后自动回退到 Screenscraper
 - **多线程刮削**：Libretro 数据源支持多线程并行刮削（最多3线程），大幅提升刮削速度
@@ -14,36 +18,39 @@
 - **启动日志清空**：程序启动时自动清空日志文件，避免累积旧日志
 - **网络重试机制**：遇到临时网络错误（DNS失败、超时等）时自动重试，最多3次
 
-
 ---
 
 ## 平台
 
-![Platform](https://img.shields.io/badge/platform-Anbernic-orange.svg)
+![Platform](https://img.shields.io/badge/platform-Anbernic%20%7C%20RGDS-orange.svg)
 
 ## 功能特性
 
-- **简单易用**：直接在 Anbernic 设备上下载封面媒体
-- **友好界面**：专为 Anbernic 设备设计的简洁界面
-- **广泛兼容**：支持多种 ROM 文件类型和多种 Anbernic 型号
+- **简单易用**：直接在设备上下载封面媒体
+- **友好界面**：专为掌上游戏设备设计的简洁界面
+- **广泛兼容**：支持多种 ROM 文件类型和多种设备型号
 
 ## 支持设备
 
-已测试：**RG35XX H**
+**Anbernic：**
+- 已测试：**RG35XX H**
+- 理论支持：RG40XXV、RGcubeXX、RG28xx、RG34xx
+- 可能兼容：任何 Python >= 3.7 的 Anbernic 掌机
 
-理论支持：RG40XXV、RGcubeXX、RG28xx
-
-可能兼容：任何 Python >= 3.7 的 Anbernic 掌机
+**RGDS（Linux）：**
+- 支持 Knulli / Rocknix 固件
+- 已在多款 RGDS 掌机上测试
 
 ## 安装
 
 1. **下载最新版本**：
-   - 前往 [Releases](https://github.com/Julioevm/tiny-scraper/releases) 下载最新版本
+   - 前往 [Releases](https://github.com/wang1025475397/tiny-scraper-by-libretro/releases) 下载最新版本
 
 2. **传输到设备**：
    - 解压并将内容复制到设备的 `APPS` 目录
-   - SD2: `/mnt/sdcard/Roms/APPS`
-   - SD1: `/mnt/mmc/Roms/APPS`
+   - Anbernic SD2: `/mnt/sdcard/Roms/APPS`
+   - Anbernic SD1: `/mnt/mmc/Roms/APPS`
+   - RGDS: `/roms/apps/`
 
 3. **配置 config.json**：
    在 `tiny_scraper` 文件夹中创建 `config.json` 文件：
@@ -70,7 +77,8 @@
 | `preferred_sources` | 数据源优先级：`libretro`（本地缓存）、`screenscraper`（在线查询） |
 
 4. **启动程序**：
-   从主菜单进入应用中心，选择 Apps，启动 Tiny Scraper
+   - Anbernic：从主菜单进入应用中心，选择 Apps，启动 Tiny Scraper
+   - RGDS（Knulli/Rocknix）：从游戏菜单的 Apps 栏目启动
 
 ## 数据源说明
 
