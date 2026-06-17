@@ -9,8 +9,8 @@
 ## What's New
 
 - **UI Redesign**: Completely refactored user interface with a modern look, supporting multiple screen resolutions for different Anbernic devices (RG28xx, RG34xx, RGcubeXX)
-- **RGDS Linux Support**: Now supports RGDS series devices running Linux (Knulli / Rocknix), expanding beyond the original Anbernic-only support
-- **Libretro Data Source**: Added Libretro Thumbnails as a data source, supporting fetching game covers from locally cached thumbnail library
+- **RGDS Linux Support**: Now supports RGDS series devices running official Linux firmware
+- **Libretro Data Source**: Added Libretro Thumbnails as a data source
 - **Multi-Source Automatic Fallback**: Supports configuring multiple data sources, prioritizes Libretro, automatically falls back to Screenscraper on failure
 - **Multi-Threaded Scraping**: Libretro data source supports multi-threaded parallel scraping (up to 3 threads), significantly improving scraping speed
 - **Smart Game Name Matching**: Intelligent mapping from Chinese game names to English names via merged_games.json
@@ -38,7 +38,7 @@
 - Possibly compatible: Any Anbernic handheld with Python >= 3.7
 
 **RGDS (Linux):**
-- Supports Knulli / Rocknix firmware
+- Supports official Linux firmware
 - Tested on various RGDS handheld devices
 
 ## Installation
@@ -78,7 +78,7 @@
 
 4. **Start Tiny Scraper:**
    - Anbernic: From the main menu, go to App Center, select Apps and launch Tiny Scraper.
-   - RGDS (Knulli/Rocknix): Launch from the Apps section in the game menu.
+   - RGDS: Launch from the Apps section in the game menu.
 
 ## Data Source Description
 

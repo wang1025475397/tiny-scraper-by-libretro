@@ -9,8 +9,8 @@
 ## 新增功能
 
 - **界面重构**：全新设计的用户界面，支持多种屏幕分辨率（RG28xx、RG34xx、RGcubeXX）
-- **RGDS Linux 支持**：新增对 RGDS 系列 Linux 设备（Knulli / Rocknix）的支持，不再局限于 Anbernic 设备
-- **Libretro 数据源支持**：新增 Libretro Thumbnails 作为数据源，支持从本地缓存的缩略图库获取游戏封面
+- **RGDS Linux 支持**：新增对 RGDS 系列官方 Linux 固件的支持
+- **Libretro 数据源支持**：新增 Libretro Thumbnails 作为数据源
 - **多数据源自动回退**：支持配置多个数据源，优先使用 Libretro，失败后自动回退到 Screenscraper
 - **多线程刮削**：Libretro 数据源支持多线程并行刮削（最多3线程），大幅提升刮削速度
 - **游戏名称智能匹配**：通过 merged_games.json 实现中文游戏名称到英文名称的智能映射
@@ -38,7 +38,7 @@
 - 可能兼容：任何 Python >= 3.7 的 Anbernic 掌机
 
 **RGDS（Linux）：**
-- 支持 Knulli / Rocknix 固件
+- 支持官方 Linux 固件
 - 已在多款 RGDS 掌机上测试
 
 ## 安装
@@ -78,7 +78,7 @@
 
 4. **启动程序**：
    - Anbernic：从主菜单进入应用中心，选择 Apps，启动 Tiny Scraper
-   - RGDS（Knulli/Rocknix）：从游戏菜单的 Apps 栏目启动
+   - RGDS：从游戏菜单的 Apps 栏目启动
 
 ## 数据源说明
 
