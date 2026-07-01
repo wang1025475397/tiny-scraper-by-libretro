@@ -19,5 +19,7 @@
   "Missing media:": "メディアが見つかりません:",
   "Roms:": "ゲーム数:",
   "Retrying": "再試行中",
-  "ROM(s) with screenscraper...": "ROM(s) を screenscraper で再試行..."
+  "ROM(s) with screenscraper...": "ROM(s) を screenscraper で再試行...",
+  "Recent Scrapes": "最近のスクレイプ",
+  "Lower screen: recently scraped game previews": "下画面: 最近スクレイプしたゲームプレビュー"
 }

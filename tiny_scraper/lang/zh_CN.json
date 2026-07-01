@@ -19,5 +19,7 @@
   "Missing media:": "缺少预览图:",
   "Roms:": "游戏数量:",
   "Retrying": "正在重试",
-  "ROM(s) with screenscraper...": "个游戏使用 screenscraper..."
+  "ROM(s) with screenscraper...": "个游戏使用 screenscraper...",
+  "Recent Scrapes": "最近刮削",
+  "Lower screen: recently scraped game previews": "下屏: 最近刮削的游戏预览"
 }
