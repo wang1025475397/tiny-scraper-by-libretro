@@ -8,6 +8,9 @@
 
 ## What's New
 
+- **Dual Screen Support**: Added lower screen display for recently scraped game previews, optimized for RGcubeXX and other dual-screen capable devices
+- **Scrape History Display**: The lower screen now shows recently scraped game previews, making it easy to review results at a glance
+- **Multi-Language Support**: Now supports 10 languages including English, Simplified/Traditional Chinese, Japanese, Korean, Spanish, Russian, German, French, and Portuguese (Brazil). Automatically detects device system language
 - **UI Redesign**: Completely refactored user interface with a modern look, supporting multiple screen resolutions for different Anbernic devices (RG28xx, RG34xx, RGcubeXX)
 - **RGDS Linux Support**: Now supports RGDS series devices running official Linux firmware
 - **Libretro Data Source**: Added Libretro Thumbnails as a data source
@@ -17,6 +20,10 @@
 - **Detailed Scraping Logs**: Prints detailed logs during each scrape, including data source, time spent, success/failure status
 - **Startup Log Clear**: Automatically clears log file on program startup, avoiding accumulation of old logs
 - **Network Retry Mechanism**: Automatically retries on temporary network errors (DNS failure, timeout, etc.), up to 3 attempts
+
+---
+
+![Screenshot](./screenshot.jpg)
 
 ---
 
