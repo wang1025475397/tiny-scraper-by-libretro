@@ -28,9 +28,9 @@ def main():
     if log_path.exists():
         log_path.write_text("")
     
-    # Initialize graphics system first with hardware info
+    # Initialize graphics system first with hardware info (dual screen)
     import graphic as gr
-    gr.draw_start(hw_info)
+    gr.draw_start_dual(hw_info)
     gr.imgMain = gr.create_image()
     gr.draw_active(gr.imgMain)
     

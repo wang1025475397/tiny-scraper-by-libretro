@@ -14,9 +14,9 @@ import socket
 from anbernic import Anbernic
 from scraper import Scraper
 from systems import get_system_id
-from thumbnail_matcher import matcher as thumbnail_matcher, DEF_SCORE as THUMBNAIL_DEF_SCORE
+from thumbnail_matcher import matcher as thumbnail_matcher, DEF_SCORE as THUMBNAIL_DEF_SCORE, find_media_by_crc
 from thumbnail_matcher import find_merged_game_by_name, merged_game_media_names, load_platform_aliases, normalize_platform_alias
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 from io import BytesIO
 
 translator = Translator(system_lang)
@@ -29,6 +29,9 @@ scraper = Scraper()
 skip_input_check = False
 missing_media_cache = {}
 cached_storage_path = None
+
+# 刮削历史记录 (最多4条): [(game_name, img_path), ...]
+scrape_history = []
 
 # 多线程刮削时的全局锁，用于保护控制台输出和状态计数
 scrape_lock = threading.Lock()
@@ -167,6 +170,7 @@ def load_console_menu() -> None:
     button_circle((button_x, button_y), "M", f"{translator.translate('Exit')}")
 
     gr.draw_paint()
+    render_bottom_screen()
 
 
 def load_roms_menu() -> None:
@@ -220,6 +224,7 @@ def load_roms_menu() -> None:
         if screenshot:
             img_path: Path = imgs_folder / f"{rom.name}.png"
             save_screenshot(img_path, screenshot)
+            add_to_scrape_history(rom.name, img_path)
             gr.draw_log(
                 f"{translator.translate('Scraping completed')}", fill=gr.colorBlue, outline=gr.colorBlueD1
             )
@@ -270,12 +275,13 @@ def load_roms_menu() -> None:
                 # 处理完成的任务
                 for future in concurrent.futures.as_completed(futures):
                     rom = futures[future]
-                    rom_name, success_flag = future.result()
+                    rom_name, success_flag, img_path_str = future.result()
                     if success_flag:
                         success += 1
+                        add_to_scrape_history(rom_name, Path(img_path_str))
                     else:
-                        failed_roms.append(rom)  # 收集失败的 ROM，用于回退处理
-                        failure += 1  # 先计入失败
+                        failed_roms.append(rom)
+                        failure += 1
                     progress += 1
                     gr.draw_log(
                         f"{translator.translate('Scraping')} {progress} {translator.translate('of')} {total_roms}",
@@ -307,9 +313,10 @@ def load_roms_menu() -> None:
                     if screenshot:
                         img_path: Path = imgs_folder / f"{rom.name}.png"
                         save_screenshot(img_path, screenshot)
+                        add_to_scrape_history(rom.name, img_path)
                         print(f"Done scraping {rom.name} with screenscraper. Saved file to {img_path}")
                         success += 1
-                        failure -= 1  # 从失败中减去，因为成功了
+                        failure -= 1
                     else:
                         print(f"Failed to get screenshot for {rom.name} with screenscraper")
                     
@@ -333,6 +340,7 @@ def load_roms_menu() -> None:
                     if screenshot:
                         img_path: Path = imgs_folder / f"{rom.name}.png"
                         save_screenshot(img_path, screenshot)
+                        add_to_scrape_history(rom.name, img_path)
                         print(f"Done scraping {rom.name}. Saved file to {img_path}")
                         success += 1
                     else:
@@ -414,6 +422,7 @@ def load_roms_menu() -> None:
     button_circle((button_x, button_y), "M", f"{translator.translate('Exit')}")
 
     gr.draw_paint()
+    render_bottom_screen()
 
 def scrape_with_sources(game_name: str, crc: str, system_id: int, rom_path: Path, system: str, source_filter: str = None) -> bytes | None:
     """根据配置的数据源优先级依次尝试获取截图
@@ -454,7 +463,7 @@ def scrape_with_sources(game_name: str, crc: str, system_id: int, rom_path: Path
         start_time = time.time()
         
         if source == "libretro":
-            result = scrape_screenshot_from_thumbnail_matcher(search_name, rom_path, system)
+            result = scrape_screenshot_from_thumbnail_matcher(search_name, rom_path, system, crc)
             elapsed = time.time() - start_time
             if result:
                 screenshot, score = result
@@ -481,35 +490,45 @@ def scrape_with_sources(game_name: str, crc: str, system_id: int, rom_path: Path
     return None
 
 
-def scrape_single_rom(rom, system_id, system_path, imgs_folder, selected_system, source_type) -> tuple[str, bool]:
-    """单个ROM刮削处理函数，供多线程调用"""
+def scrape_single_rom(rom, system_id, system_path, imgs_folder, selected_system, source_type) -> tuple[str, bool, str]:
+    """单个ROM刮削处理函数，供多线程调用。返回 (rom_name, success, img_path_str)"""
     rom.set_crc(scraper.get_crc32_from_file(system_path / rom.filename))
     
-    # 使用 source_filter 参数确保只使用指定的数据源
-    # 当 source_type 为 "libretro" 时，不会回退到 screenscraper
     screenshot = scrape_with_sources(
         rom.name, rom.crc, system_id, system_path / rom.filename, selected_system,
-        source_filter=source_type  # 关键：限制只使用指定数据源
+        source_filter=source_type
     )
     
-    # 使用锁保护控制台输出
     with scrape_lock:
         if screenshot:
             img_path = imgs_folder / f"{rom.name}.png"
             save_screenshot(img_path, screenshot)
             print(f"Done scraping {rom.name}. Saved file to {img_path}")
-            return (rom.name, True)
+            return (rom.name, True, str(img_path))
         else:
             print(f"Failed to get screenshot for {rom.name}")
-            return (rom.name, False)
+            return (rom.name, False, "")
 
-def scrape_screenshot_from_thumbnail_matcher(game_name: str, rom_path: Path, system: str) -> tuple[bytes, float] | tuple[None, float]:
-    """从 thumbnail_matcher 数据源获取截图，返回(图片bytes, 相似度分数)或(None, 分数)"""
+def scrape_screenshot_from_thumbnail_matcher(game_name: str, rom_path: Path, system: str, crc: str = "") -> tuple[bytes, float] | tuple[None, float]:
+    """从 thumbnail_matcher 数据源获取截图，返回(图片bytes, 相似度分数)或(None, 分数)
+    
+    当提供 CRC 时，优先用 CRC 查 metadata（避免重复读取 ROM 文件，省去 SD 卡 I/O）。
+    下载失败时自动重试最多 2 次（共 3 次尝试），递增等待 3s/6s。
+    """
     try:
-        # 传入 min_score=0 获取所有匹配（即使低于阈值也要显示分数）
-        game_media = thumbnail_matcher.find_game_media(rom_path, system, min_score=0)
+        # 第一阶段：CRC 优先查找（避免重复读取 ROM 文件，提速多线程）
+        game_media = None
+        if crc:
+            try:
+                game_media = find_media_by_crc(crc, system, min_score=0)
+            except Exception:
+                pass  # CRC 查找失败则回退到完整路径查找
         
-        # 获取最佳匹配分数（即使低于阈值）
+        # 第二阶段：CRC 未命中时回退到完整路径查找（会读取 ROM 文件计算 CRC）
+        if not game_media or not game_media.media:
+            game_media = thumbnail_matcher.find_game_media(rom_path, system, min_score=0)
+        
+        # 获取最佳匹配分数（即使低于阈值也要显示分数）
         score = 0.0
         if game_media and game_media.media:
             score = game_media.media[0].score
@@ -535,14 +554,25 @@ def scrape_screenshot_from_thumbnail_matcher(game_name: str, rom_path: Path, sys
             print(f"[MATCH] {best_match.name} (score: {score:.1f})")
             print(f"[URL] {url}")
             
+            # 下载图片，最多重试 3 次（首次 + 2 次重试），递增等待 3s/6s
             ctx = ssl.create_default_context()
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE
             
             from urllib.request import Request, urlopen
-            request = Request(url, headers={"User-Agent": "thumbnail-matcher/1.0"})
-            with urlopen(request, context=ctx, timeout=15) as response:
-                return (response.read(), score)
+            for attempt in range(3):
+                try:
+                    request = Request(url, headers={"User-Agent": "thumbnail-matcher/1.0"})
+                    with urlopen(request, context=ctx, timeout=15) as response:
+                        return (response.read(), score)
+                except Exception as e:
+                    if attempt < 2:
+                        wait = (attempt + 1) * 3
+                        print(f"[RETRY] Download attempt {attempt+1}/3 failed ({e}), retrying in {wait}s...")
+                        time.sleep(wait)
+                    else:
+                        print(f"[ERROR] Download failed after 3 attempts: {e}")
+            return (None, score)
         else:
             print(f"[INFO] No media found for {game_name} (best score: {score:.1f})")
             return (None, score)
@@ -581,3 +611,154 @@ def button_rectangle(pos: tuple[int, int], button: str, text: str) -> None:
     )
     gr.draw_text((pos[0] + 30, pos[1] + 12), button, anchor="mm")
     gr.draw_text((pos[0] + 65, pos[1] + 12), text, font=13, anchor="lm")
+
+
+def add_to_scrape_history(game_name: str, img_path: Path) -> None:
+    """记录刮削成功的游戏到下屏历史 (最多保存8条, 循环覆盖)"""
+    global scrape_history
+    
+    # 去重: 如果已存在同名记录，移除旧的
+    scrape_history = [(n, p) for n, p in scrape_history if n != game_name]
+    
+    # 插入到最前面
+    scrape_history.insert(0, (game_name, str(img_path)))
+    
+    # 只保留最新8条 (超出则循环覆盖)
+    if len(scrape_history) > 8:
+        scrape_history = scrape_history[:8]
+    
+    render_bottom_screen()
+
+
+def render_bottom_screen() -> None:
+    """渲染下屏: 2行×4列展示最近刮削的8个游戏封面+名称 (循环覆盖)"""
+    if not gr.window2 or not gr.renderer2:
+        return
+    
+    global scrape_history
+    
+    bw, bh = gr.screen_width, gr.screen_height  # 下屏尺寸 (通常640x480)
+    
+    # 创建下屏 PIL 图像
+    img = Image.new("RGBA", (bw, bh), color=(20, 20, 20, 255))
+    draw = ImageDraw.Draw(img)
+    
+    # 字体
+    try:
+        font_title = ImageFont.truetype(
+            "/usr/share/fonts/source-han-sans-cn/SourceHanSansCN-Regular.otf", 18
+        )
+        font_name = ImageFont.truetype(
+            "/usr/share/fonts/source-han-sans-cn/SourceHanSansCN-Regular.otf", 12
+        )
+        font_empty = ImageFont.truetype(
+            "/usr/share/fonts/source-han-sans-cn/SourceHanSansCN-Regular.otf", 10
+        )
+    except:
+        try:
+            font_title = ImageFont.truetype("/usr/share/fonts/dejavu/DejaVuSansMono.ttf", 16)
+            font_name = ImageFont.truetype("/usr/share/fonts/dejavu/DejaVuSansMono.ttf", 11)
+            font_empty = ImageFont.truetype("/usr/share/fonts/dejavu/DejaVuSansMono.ttf", 9)
+        except:
+            font_title = font_name = font_empty = ImageFont.load_default()
+    
+    # 标题栏 (多语言)
+    title = translator.translate("Recent Scrapes")
+    title_text = f"★ {title}"
+    draw.rectangle([0, 0, bw, 28], fill=(41, 41, 41, 255))
+    bbox = draw.textbbox((0, 0), title_text, font=font_title)
+    tw = bbox[2] - bbox[0]
+    draw.text(((bw - tw) // 2, 4), title_text, fill="white", font=font_title)
+    
+    # 刮削计数
+    subtitle = f"{len(scrape_history)} / 8"
+    draw.text((bw - 45, 6), subtitle, fill=(150, 150, 150, 255), font=font_name)
+    
+    # 底部提示栏 (多语言)
+    hint_y = bh - 24
+    draw.rectangle([0, hint_y, bw, bh], fill=(41, 41, 41, 255))
+    hint_text = translator.translate("Lower screen: recently scraped game previews")
+    hb = draw.textbbox((0, 0), hint_text, font=font_empty)
+    hw = hb[2] - hb[0]
+    draw.text(((bw - hw) // 2, hint_y + 5), hint_text, fill=(150, 150, 150, 255), font=font_empty)
+    
+    # 2行×4列 槽位布局
+    cols = 4
+    rows = 2
+    slot_w = 148       # 每个槽位宽度
+    slot_h = 195       # 每个槽位高度 (含图片+名称)
+    img_h = 145        # 缩略图区域高度
+    gap_x = 12         # 水平间距
+    gap_y = 8          # 垂直间距
+    total_w = cols * slot_w + (cols - 1) * gap_x  # 4*148 + 3*12 = 628
+    start_x = (bw - total_w) // 2
+    start_y = 34       # 标题栏下方
+    
+    for idx in range(cols * rows):
+        col = idx % cols
+        row = idx // cols
+        sx = start_x + col * (slot_w + gap_x)
+        sy = start_y + row * (slot_h + gap_y)
+        
+        # 槽位背景
+        draw.rounded_rectangle([sx, sy, sx + slot_w, sy + slot_h], 6,
+                               fill=(41, 41, 41, 255), outline=(56, 56, 56, 255))
+        
+        if idx < len(scrape_history):
+            game_name, img_path_str = scrape_history[idx]
+            img_path = Path(img_path_str)
+            
+            # 加载并绘制缩略图
+            try:
+                if img_path.exists():
+                    thumb = Image.open(img_path).convert("RGBA")
+                    tw_orig, th_orig = thumb.size
+                    scale = min((slot_w - 4) / tw_orig, img_h / th_orig, 1.0)
+                    new_w = int(tw_orig * scale)
+                    new_h = int(th_orig * scale)
+                    thumb = thumb.resize((new_w, new_h), Image.LANCZOS)
+                    
+                    paste_x = sx + (slot_w - new_w) // 2
+                    paste_y = sy + 3 + (img_h - new_h) // 2
+                    img.paste(thumb, (paste_x, paste_y), thumb)
+                else:
+                    _draw_placeholder(draw, sx, sy, slot_w, img_h, font_empty)
+            except Exception:
+                _draw_placeholder(draw, sx, sy, slot_w, img_h, font_empty)
+            
+            # 游戏名称 (截断过长名称, 12号字体约17字符)
+            name_display = game_name if len(game_name) <= 15 else game_name[:14] + "…"
+            name_bbox = draw.textbbox((0, 0), name_display, font=font_name)
+            nw = name_bbox[2] - name_bbox[0]
+            draw.text((sx + (slot_w - nw) // 2, sy + img_h + 6),
+                      name_display, fill="white", font=font_name)
+        else:
+            # 空槽位
+            _draw_placeholder(draw, sx, sy, slot_w, img_h, font_empty)
+            
+            empty_text = "--"
+            eb = draw.textbbox((0, 0), empty_text, font=font_name)
+            ew = eb[2] - eb[0]
+            draw.text((sx + (slot_w - ew) // 2, sy + img_h + 6),
+                      empty_text, fill=(100, 100, 100, 255), font=font_name)
+    
+    # 保存并渲染到下屏
+    gr.bottomImage = img
+    gr.bottomDraw = ImageDraw.Draw(gr.bottomImage)
+    gr.draw_paint_bottom()
+
+
+def _draw_placeholder(draw, sx: int, sy: int, slot_w: int, img_h: int, font) -> None:
+    """画空槽位占位符 (虚线框 + 问号)"""
+    # 虚线边框效果: 用圆角矩形
+    draw.rounded_rectangle(
+        [sx + 8, sy + 4, sx + slot_w - 8, sy + 4 + img_h], 4,
+        outline=(80, 80, 80, 255)
+    )
+    # 问号
+    q_text = "?"
+    qb = draw.textbbox((0, 0), q_text, font=font)
+    qw = qb[2] - qb[0]
+    qh = qb[3] - qb[1]
+    draw.text((sx + (slot_w - qw) // 2, sy + 4 + (img_h - qh) // 2),
+              q_text, fill=(100, 100, 100, 255), font=font)
