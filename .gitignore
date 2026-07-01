@@ -9,3 +9,4 @@ cli_scraper.py
 tiny_scraper.sh
 libretro_data/
 *.code-workspace
+out/
